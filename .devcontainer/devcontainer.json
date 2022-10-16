@@ -1,0 +1,59 @@
+{
+  "name": "std_esp_rust_lighting",
+  // Select between image and build propieties to pull or build the image.
+  // "image": "docker.io/espressif/idf-rust:esp32_v4.4_1.64.0.0",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "ESP_BOARD": "esp32"
+    }
+  },
+  "settings": {
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file",
+    "editor.formatOnType": true,
+    "lldb.executable": "/usr/bin/lldb",
+    "files.watcherExclude": {
+      "**/target/**": true
+    },
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "rust-analyzer.checkOnSave.allTargets": false,
+    "[rust]": {
+      "editor.defaultFormatter": "rust-lang.rust-analyzer"
+    },
+    "terminal.integrated.defaultProfile.linux": "zsh",
+    "terminal.integrated.profiles.linux": {
+      "zsh": {
+        "path": "/bin/zsh"
+      }
+    }
+  },
+  "extensions": [
+    "rust-lang.rust-analyzer",
+    "tamasfe.even-better-toml",
+    "serayuzgur.crates",
+    "mutantdino.resourcemonitor",
+    "yzhang.markdown-all-in-one",
+    "webfreak.debug",
+    "actboy168.tasks",
+    "panicbit.cargo"
+  ],
+  "forwardPorts": [
+    9012,
+    9333,
+    8000
+  ],
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind,consistency=cached",
+  "workspaceFolder": "${localWorkspaceFolder}",
+  "runArgs": [
+    "--device=/dev/ttyUSB0",
+    "--group-add=keep-groups"
+  ],
+  "mounts": [
+    "source=${localEnv:XDG_RUNTIME_DIR}/xdg-open-server,target=/run/user/0/xdg-open-server,type=bind,consistency=cached,readonly"
+  ],
+  "containerEnv": {
+    "DISPLAY": "${localEnv:DISPLAY}",
+  }
+}
