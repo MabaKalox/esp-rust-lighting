@@ -53,7 +53,7 @@ fn main() -> anyhow::Result<()> {
 
     // Bind the log crate to the ESP Logging facilities
     EspLogger::initialize_default();
-    EspLogger.set_target_level("*", log::LevelFilter::Error);
+    // EspLogger.set_target_level("*", log::LevelFilter::Error);
     // std::env::set_var("RUST_BACKTRACE", "1");
 
     let perephirals = Peripherals::take().unwrap();
@@ -81,7 +81,7 @@ fn main() -> anyhow::Result<()> {
     get("https://google.com")?;
 
     let mut ws2812 =
-        LedPixelEsp32Rmt::<RGBW8, LedPixelColorGrbw32>::new(0, pins.gpio27.pin().try_into()?)
+        LedPixelEsp32Rmt::<RGBW8, LedPixelColorGrbw32>::new(0, pins.gpio6.pin().try_into()?)
             .unwrap();
 
     let mut frames_counter = 0;
