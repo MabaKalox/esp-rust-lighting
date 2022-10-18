@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Ok;
+use embedded_hal::digital::v2::OutputPin;
 use embedded_svc::{
     http::{
         client::{
@@ -53,11 +54,16 @@ fn main() -> anyhow::Result<()> {
 
     // Bind the log crate to the ESP Logging facilities
     EspLogger::initialize_default();
-    // EspLogger.set_target_level("*", log::LevelFilter::Error);
-    // std::env::set_var("RUST_BACKTRACE", "1");
+    EspLogger.set_target_level("*", log::LevelFilter::Error);
 
     let perephirals = Peripherals::take().unwrap();
     let pins = perephirals.pins;
+
+    let mut led1 = pins.gpio12.into_output()?;
+    let mut led2 = pins.gpio13.into_output()?;
+
+    led1.set_high()?;
+    led2.set_high()?;
 
     let netif_stack = Arc::new(EspNetifStack::new()?);
     let sys_loop_stack = Arc::new(EspSysLoopStack::new()?);
@@ -80,6 +86,9 @@ fn main() -> anyhow::Result<()> {
 
     get("https://google.com")?;
 
+    led1.set_low()?;
+    led2.set_low()?;
+
     let mut ws2812 =
         LedPixelEsp32Rmt::<RGBW8, LedPixelColorGrbw32>::new(0, pins.gpio6.pin().try_into()?)
             .unwrap();
@@ -96,7 +105,7 @@ fn main() -> anyhow::Result<()> {
 
             ws2812.set_color(RGBW::from((color.r, color.g, color.b, White(0))))?;
 
-            // Smasrt delay
+            // Smart delay
             if write_start.elapsed() < target_delay {
                 std::thread::sleep(target_delay - write_start.elapsed());
             }
@@ -111,16 +120,16 @@ fn main() -> anyhow::Result<()> {
         }
     }
     // loop {
-    //     my_trait(RGBW::from((5, 0, 0, White(0))))?;
+    //     ws2812.set_color(RGBW::from((5, 0, 0, White(0))))?;
     //     std::thread::sleep(Duration::from_secs(1));
-
-    //     my_trait(RGBW::from((0, 5, 0, White(0))))?;
+    //
+    //     ws2812.set_color(RGBW::from((0, 5, 0, White(0))))?;
     //     std::thread::sleep(Duration::from_secs(1));
-
-    //     my_trait(RGBW::from((0, 0, 5, White(0))))?;
+    //
+    //     ws2812.set_color(RGBW::from((0, 0, 5, White(0))))?;
     //     std::thread::sleep(Duration::from_secs(1));
-
-    //     my_trait(RGBW::from((0, 0, 0, White(5))))?;
+    //
+    //     ws2812.set_color(RGBW::from((0, 0, 0, White(5))))?;
     //     std::thread::sleep(Duration::from_secs(1));
     // }
 
