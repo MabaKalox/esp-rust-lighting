@@ -22,17 +22,19 @@ use esp_idf_svc::{
     netif::EspNetifStack,
     nvs::EspDefaultNvs,
     ping,
-    sntp::{self, SyncStatus},
+    sntp::SyncStatus,
     sysloop::EspSysLoopStack,
     wifi::EspWifi,
 };
 use esp_idf_sys::{self as _}; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
-use log::info;
+use log::{debug, info};
 use smart_leds_trait::{SmartLedsWrite, White, RGBA, RGBW};
 use ws2812_esp32_rmt_driver::{
     driver::color::{LedPixelColorGrbw32, LedPixelColorImpl},
     LedPixelEsp32Rmt, RGBW8,
 };
+mod sub_modules;
+use sub_modules::esp_sntp_wrapper::EspSntpWrapper;
 
 #[toml_cfg::toml_config]
 struct TConfig {
@@ -71,20 +73,16 @@ fn main() -> anyhow::Result<()> {
 
     let _wifi_interface = wifi(netif_stack, sys_loop_stack, default_nvs)?;
 
-    let sntp = sntp::EspSntp::new_default()?;
-    busy_wait_timeout(
-        || sntp.get_sync_status() == SyncStatus::Completed,
-        Duration::from_millis(100),
-        Duration::from_secs(20),
-    )?;
-    info!("SNTP synced");
-
+    let sntp = EspSntpWrapper::new_default()?;
+    sntp.wait_status_with_timeout(Duration::from_secs(10), |status| {
+        *status == SyncStatus::Completed
+    })?;
     println!(
         "Current time is: {:?}",
         chrono::DateTime::from(std::time::SystemTime::now())
     );
 
-    get("https://google.com")?;
+    // get("https://google.com")?;
 
     led1.set_low()?;
     led2.set_low()?;
@@ -266,36 +264,6 @@ fn get(url: &str) -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-fn busy_wait_timeout<F: Fn() -> bool>(
-    check: F,
-    check_interval: Duration,
-    timeout: Duration,
-) -> anyhow::Result<()> {
-    let now = std::time::Instant::now();
-
-    loop {
-        if check() {
-            return Ok(());
-        }
-        if now.elapsed() > timeout {
-            anyhow::bail!("Time out!");
-        }
-        if !check_interval.is_zero() {
-            std::thread::sleep(check_interval);
-        }
-    }
-}
-
-fn delay(duration: Duration) {
-    let now = std::time::Instant::now();
-
-    loop {
-        if now.elapsed() > duration {
-            break;
-        }
-    }
 }
 
 trait SetColor {
