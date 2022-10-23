@@ -15,7 +15,7 @@ use embedded_svc::{
     ping::Ping,
     wifi::{self, Wifi},
 };
-use esp_idf_hal::{gpio::Pin, peripherals::Peripherals};
+use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_svc::{
     http::client::{EspHttpClient, EspHttpClientConfiguration},
     log::EspLogger,
@@ -27,14 +27,14 @@ use esp_idf_svc::{
     wifi::EspWifi,
 };
 use esp_idf_sys::{self as _}; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
-use log::{debug, info};
-use smart_leds_trait::{SmartLedsWrite, White, RGBA, RGBW};
-use ws2812_esp32_rmt_driver::{
-    driver::color::{LedPixelColorGrbw32, LedPixelColorImpl},
-    LedPixelEsp32Rmt, RGBW8,
-};
+use log::info;
+use smart_leds_trait::RGBA;
+
 mod sub_modules;
+use crate::sub_modules::led_strip_animations::AnimationConfig;
 use sub_modules::esp_sntp_wrapper::EspSntpWrapper;
+use sub_modules::led_strip_animations::LedStripAnimation;
+use sub_modules::web_server::web_server;
 
 #[toml_cfg::toml_config]
 struct TConfig {
@@ -45,10 +45,6 @@ struct TConfig {
     wifi_pass: &'static str,
 }
 
-const LED_QUANTITY: usize = 150;
-const TARGET_FPS: u64 = 60;
-const GRADIENT_DISCRETENESS: usize = 200;
-
 fn main() -> anyhow::Result<()> {
     // Temporary. Will disappear once ESP-IDF 4.4 is released, but for now it is necessary to call this function once,
     // or else some patches to the runtime implemented by esp-idf-sys might not link properly.
@@ -58,8 +54,8 @@ fn main() -> anyhow::Result<()> {
     EspLogger::initialize_default();
     EspLogger.set_target_level("*", log::LevelFilter::Error);
 
-    let perephirals = Peripherals::take().unwrap();
-    let pins = perephirals.pins;
+    let peripherals = Peripherals::take().unwrap();
+    let pins = peripherals.pins;
 
     let mut led1 = pins.gpio12.into_output()?;
     let mut led2 = pins.gpio13.into_output()?;
@@ -87,51 +83,23 @@ fn main() -> anyhow::Result<()> {
     led1.set_low()?;
     led2.set_low()?;
 
-    let mut ws2812 =
-        LedPixelEsp32Rmt::<RGBW8, LedPixelColorGrbw32>::new(0, pins.gpio6.pin().try_into()?)
-            .unwrap();
+    let mut ws2812 = LedStripAnimation::new(
+        pins.gpio6,
+        0,
+        AnimationConfig {
+            led_quantity: 150,
+            target_fps: 60,
+            animation_duration: Duration::from_secs(20),
+        },
+    )?;
 
-    let mut frames_counter = 0;
-    let mut now = std::time::Instant::now();
+    let animation_handle = ws2812.gradient(colorous::RAINBOW);
 
-    loop {
-        for i in 0..GRADIENT_DISCRETENESS {
-            let color = colorous::SINEBOW.eval_rational(i, GRADIENT_DISCRETENESS);
+    let _httpd = web_server(ws2812.config.clone())?;
 
-            let write_start = std::time::Instant::now();
-            let target_delay = Duration::from_millis(1000 / TARGET_FPS);
-
-            ws2812.set_color(RGBW::from((color.r, color.g, color.b, White(0))))?;
-
-            // Smart delay
-            if write_start.elapsed() < target_delay {
-                std::thread::sleep(target_delay - write_start.elapsed());
-            }
-
-            // Frames counter
-            frames_counter += 1;
-            if now.elapsed() >= Duration::from_secs(1) {
-                println!("Frames counted: {}", frames_counter);
-                frames_counter = 0;
-                now = std::time::Instant::now();
-            }
-        }
-    }
-    // loop {
-    //     ws2812.set_color(RGBW::from((5, 0, 0, White(0))))?;
-    //     std::thread::sleep(Duration::from_secs(1));
-    //
-    //     ws2812.set_color(RGBW::from((0, 5, 0, White(0))))?;
-    //     std::thread::sleep(Duration::from_secs(1));
-    //
-    //     ws2812.set_color(RGBW::from((0, 0, 5, White(0))))?;
-    //     std::thread::sleep(Duration::from_secs(1));
-    //
-    //     ws2812.set_color(RGBW::from((0, 0, 0, White(5))))?;
-    //     std::thread::sleep(Duration::from_secs(1));
-    // }
-
-    // Ok(())
+    println!("Starting to wait for thread");
+    animation_handle.join().unwrap();
+    Ok(())
 }
 
 fn ping(ip_settings: &ipv4::ClientSettings) -> anyhow::Result<()> {
@@ -264,16 +232,4 @@ fn get(url: &str) -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-trait SetColor {
-    fn set_color(&mut self, color: RGBA<u8, White<u8>>) -> anyhow::Result<()>;
-}
-
-impl SetColor for LedPixelEsp32Rmt<RGBA<u8, White<u8>>, LedPixelColorImpl<4, 1, 0, 2, 3>> {
-    fn set_color(&mut self, color: RGBA<u8, White<u8>>) -> anyhow::Result<()> {
-        let pixels = std::iter::repeat(color).take(LED_QUANTITY);
-        self.write(pixels)?;
-        Ok(())
-    }
 }

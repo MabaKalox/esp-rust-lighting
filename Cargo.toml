@@ -27,6 +27,7 @@ chrono = { version = "0.4.22", default-features = false, features = ["std"] }
 smart-leds-trait = "0.2.1"
 ws2812-esp32-rmt-driver = "0.4.0"
 colorous = "1.0.8"
+nb = "1.0.0"
 
 [build-dependencies]
 embuild = "0.30"
