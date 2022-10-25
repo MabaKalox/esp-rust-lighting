@@ -1,7 +1,8 @@
 use crate::RGBA;
 use anyhow::{anyhow, Result};
 use esp_idf_hal::gpio::OutputPin;
-use smart_leds_trait::{SmartLedsWrite, White, RGBW};
+use smart_leds_trait::{SmartLedsWrite, White, RGB, RGBW};
+use std::num::NonZeroU8;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -14,6 +15,7 @@ pub struct AnimationConfig {
     pub led_quantity: usize,
     pub animation_duration: Duration,
     pub target_fps: usize,
+    pub brighness: NonZeroU8,
 }
 
 pub struct LedStripAnimation {
@@ -37,10 +39,10 @@ impl LedStripAnimation {
 
     pub fn set_color(
         ws2812: &mut Ws2812I,
-        led_quantinty: usize,
+        led_quantity: usize,
         color: RGBA<u8, White<u8>>,
     ) -> Result<()> {
-        let pixels = std::iter::repeat(color).take(led_quantinty);
+        let pixels = std::iter::repeat(color).take(led_quantity);
         ws2812.write(pixels)?;
         Ok(())
     }
@@ -54,25 +56,31 @@ impl LedStripAnimation {
             let mut now = std::time::Instant::now();
 
             loop {
-                let (gradient_discreteness, target_delay, led_quantity) = {
+                let (gradient_discreteness, target_delay, led_quantity, brighness) = {
                     let config = config.lock().unwrap();
                     let gradient_discreteness =
                         config.target_fps * config.animation_duration.as_secs() as usize;
                     let target_delay = Duration::from_millis(1000 / config.target_fps as u64);
 
-                    (gradient_discreteness, target_delay, config.led_quantity)
+                    (
+                        gradient_discreteness,
+                        target_delay,
+                        config.led_quantity,
+                        config.brighness,
+                    )
                 };
 
                 for i in 0..gradient_discreteness {
                     let write_start = std::time::Instant::now();
 
                     let color = gradient.eval_rational(i, gradient_discreteness);
-                    Self::set_color(
-                        &mut ws2812.lock().unwrap(),
-                        led_quantity,
-                        RGBW::from((color.r, color.g, color.b, White(0))),
-                    )
-                    .unwrap();
+                    let mut rgbw = RGBW::from((color.r, color.g, color.b, White(0)));
+
+                    rgbw.r /= u8::MAX / brighness;
+                    rgbw.g /= u8::MAX / brighness;
+                    rgbw.b /= u8::MAX / brighness;
+
+                    Self::set_color(&mut ws2812.lock().unwrap(), led_quantity, rgbw).unwrap();
 
                     // Smart delay
                     if write_start.elapsed() < target_delay {
@@ -82,7 +90,7 @@ impl LedStripAnimation {
                     // Frames counter
                     frames_counter += 1;
                     if now.elapsed() >= Duration::from_secs(1) {
-                        println!("Frames counted: {}", frames_counter);
+                        // println!("Frames counted: {}", frames_counter);
                         frames_counter = 0;
                         now = std::time::Instant::now();
                     }

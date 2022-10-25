@@ -1,3 +1,6 @@
+#![feature(nonzero_min_max)]
+
+use std::num::NonZeroU8;
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Ok;
@@ -90,6 +93,7 @@ fn main() -> anyhow::Result<()> {
             led_quantity: 150,
             target_fps: 60,
             animation_duration: Duration::from_secs(20),
+            brighness: NonZeroU8::new(100).unwrap(),
         },
     )?;
 
