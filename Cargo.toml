@@ -27,8 +27,11 @@ chrono = { version = "0.4.22", default-features = false, features = ["std"] }
 smart-leds-trait = "0.2.1"
 ws2812-esp32-rmt-driver = "0.4.0"
 colorous = "1.0.8"
-nb = "1.0.0"
 url = "2.3.1"
+thiserror = "1.0.37"
+serde_qs = "0.10.1"
+serde = { version = "1.0.147", features = ["derive"] }
+humantime-serde = "1.1.1"
 
 [build-dependencies]
 embuild = "0.30"

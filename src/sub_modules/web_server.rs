@@ -1,14 +1,18 @@
-use crate::AnimationConfig;
+use crate::sub_modules::led_strip_animations::{
+    AnimationConfig, Messages, ReceivedAnimationConfig,
+};
 use embedded_svc::errors::wrap::WrapError;
 use embedded_svc::http::server::registry::Registry;
 use embedded_svc::http::server::{Request, Response};
 use embedded_svc::http::SendStatus;
 use esp_idf_svc::http::server::EspHttpServer;
-use std::num::{NonZeroU64, NonZeroU8};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use serde_qs;
+use std::sync::mpsc::{Receiver, SyncSender};
 
-pub fn web_server(led_strip_config: Arc<Mutex<AnimationConfig>>) -> anyhow::Result<EspHttpServer> {
+pub fn web_server(
+    tx: SyncSender<Messages>,
+    applied_config_rx: Receiver<AnimationConfig>,
+) -> anyhow::Result<EspHttpServer> {
     let mut server = EspHttpServer::new(&Default::default())?;
 
     server
@@ -19,38 +23,14 @@ pub fn web_server(led_strip_config: Arc<Mutex<AnimationConfig>>) -> anyhow::Resu
         .handle_get("/foo", |_req, _resp| {
             Err(WrapError("Boo, something happened!").into())
         })?
-        .handle_get("/set_animation_duration_s", {
-            let led_strip_config = led_strip_config.clone();
+        .handle_put("/set_conf", {
             move |req, resp| {
-                let query_params = url::form_urlencoded::parse(req.query_string().as_bytes());
-                let animation_duration_s = query_params
-                    .filter(|p| p.0 == "animation_duration_s")
-                    .map(|p| str::parse::<NonZeroU64>(&p.1))
-                    .next()
-                    .ok_or_else(|| anyhow::anyhow!("No query parm animation_duration_s"))??;
+                let new_config: ReceivedAnimationConfig = serde_qs::from_str(req.query_string())?;
+                tx.send(Messages::NewConfig(new_config))?;
 
-                let mut config = led_strip_config.lock().unwrap();
-                config.animation_duration = Duration::from_secs(animation_duration_s.get());
-                resp.send_str(&format!(
-                    "New animation duration is: {:?}",
-                    config.animation_duration
-                ))?;
-                Ok(())
-            }
-        })?
-        .handle_get("/set_brightness", {
-            let led_strip_config = led_strip_config.clone();
-            move |req, resp| {
-                let query_params = url::form_urlencoded::parse(req.query_string().as_bytes());
-                let brightness = query_params
-                    .filter(|p| p.0 == "brightness")
-                    .map(|p| str::parse::<NonZeroU8>(&p.1))
-                    .next()
-                    .ok_or_else(|| anyhow::anyhow!("No query param brightness"))??;
+                // Will block, but not for long, as
+                resp.send_str(&format!("{:?}", applied_config_rx.recv()))?;
 
-                let mut config = led_strip_config.lock().unwrap();
-                config.brighness = brightness;
-                resp.send_str(&format!("New brightness is: {}", config.brighness))?;
                 Ok(())
             }
         })?

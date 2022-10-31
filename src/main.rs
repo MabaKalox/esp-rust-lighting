@@ -1,8 +1,5 @@
 #![feature(nonzero_min_max)]
 
-use std::num::NonZeroU8;
-use std::{sync::Arc, time::Duration};
-
 use anyhow::Ok;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_svc::{
@@ -32,10 +29,11 @@ use esp_idf_svc::{
 use esp_idf_sys::{self as _}; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
 use log::info;
 use smart_leds_trait::RGBA;
+use std::sync::mpsc;
+use std::{sync::Arc, time::Duration};
 
 mod sub_modules;
-use crate::sub_modules::led_strip_animations::AnimationConfig;
-use sub_modules::esp_sntp_wrapper::EspSntpWrapper;
+use crate::sub_modules::esp_sntp_wrapper::EspSntpWrapper;
 use sub_modules::led_strip_animations::LedStripAnimation;
 use sub_modules::web_server::web_server;
 
@@ -86,23 +84,19 @@ fn main() -> anyhow::Result<()> {
     led1.set_low()?;
     led2.set_low()?;
 
-    let mut ws2812 = LedStripAnimation::new(
-        pins.gpio6,
-        0,
-        AnimationConfig {
-            led_quantity: 150,
-            target_fps: 60,
-            animation_duration: Duration::from_secs(20),
-            brighness: NonZeroU8::new(100).unwrap(),
-        },
-    )?;
+    let (tx, rx) = mpsc::sync_channel(0);
+    let (applied_config_tx, applied_config_rx) = mpsc::sync_channel(0);
 
-    let animation_handle = ws2812.gradient(colorous::RAINBOW);
+    let _httpd = web_server(tx, applied_config_rx)?;
 
-    let _httpd = web_server(ws2812.config.clone())?;
+    let led_strip_thead = std::thread::spawn(move || {
+        let mut ws2812 = LedStripAnimation::new(pins.gpio6, 0, Default::default()).unwrap();
+
+        ws2812.led_strip_loop(colorous::SINEBOW, rx, applied_config_tx)
+    });
 
     println!("Starting to wait for thread");
-    animation_handle.join().unwrap();
+    led_strip_thead.join().unwrap()?;
     Ok(())
 }
 
