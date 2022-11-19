@@ -15,7 +15,7 @@ opt-level = "z"
 [features]
 
 [dependencies]
-esp-idf-sys = { version = "0.31.10", features = ["binstart", "native"] }
+esp-idf-sys = { version = "0.31.11", features = ["binstart", "native"] }
 esp-idf-svc = { version = "0.42.5", features = ["experimental"] }
 esp-idf-hal = "0.38.1"
 embedded-hal = "0.2.7"

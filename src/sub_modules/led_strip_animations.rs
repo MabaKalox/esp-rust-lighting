@@ -3,7 +3,6 @@ use anyhow::{anyhow, bail, Result};
 use esp_idf_hal::gpio::OutputPin;
 use serde::Deserialize;
 use smart_leds_trait::{SmartLedsWrite, White, RGBW};
-use std::num::NonZeroU8;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::{SyncSender, TryRecvError};
 use std::time::Duration;
@@ -17,8 +16,7 @@ pub struct AnimationConfig {
     pub led_quantity: usize,
     pub animation_duration: Duration,
     pub target_fps: usize,
-    pub brightness: NonZeroU8,
-    pub white_brightness: u8,
+    pub rgb_brightness: u8,
 }
 
 #[derive(Default, PartialEq, Deserialize)]
@@ -28,8 +26,7 @@ pub struct ReceivedAnimationConfig {
     #[serde(with = "humantime_serde")]
     pub animation_duration: Option<Duration>,
     pub target_fps: Option<usize>,
-    pub brightness: Option<NonZeroU8>,
-    pub white_brightness: Option<u8>,
+    pub rgb_brightness: Option<u8>,
 }
 
 impl Default for AnimationConfig {
@@ -38,15 +35,14 @@ impl Default for AnimationConfig {
             led_quantity: 150,
             animation_duration: Duration::from_secs(20),
             target_fps: 60,
-            brightness: NonZeroU8::MAX,
-            white_brightness: u8::MIN,
+            rgb_brightness: u8::MAX,
         }
     }
 }
 
 pub enum Messages {
     NewConfig(ReceivedAnimationConfig),
-    // GetConfig,
+    SetWhite(u8), // GetConfig,
 }
 
 impl AnimationConfig {
@@ -54,17 +50,14 @@ impl AnimationConfig {
         if let Some(new_val) = new_config.target_fps {
             self.target_fps = new_val;
         }
-        if let Some(new_val) = new_config.brightness {
-            self.brightness = new_val;
+        if let Some(new_val) = new_config.rgb_brightness {
+            self.rgb_brightness = new_val;
         }
         if let Some(new_val) = new_config.led_quantity {
             self.led_quantity = new_val;
         }
         if let Some(new_val) = new_config.animation_duration {
             self.animation_duration = new_val;
-        }
-        if let Some(new_val) = new_config.white_brightness {
-            self.white_brightness = new_val;
         }
     }
 }
@@ -97,10 +90,20 @@ impl LedStripAnimation {
         rx: Receiver<Messages>,
         applied_config_tx: SyncSender<AnimationConfig>,
     ) -> Result<()> {
-        let mut i = 0;
-        let mut gradient_discreteness =
-            self.config.target_fps * self.config.animation_duration.as_secs() as usize;
-        let mut target_delay = Duration::from_millis(1000 / self.config.target_fps as u64);
+        use std::time::Instant;
+
+        let calc_delay = |target_fps| Duration::from_millis(1000 / target_fps as u64);
+        let calc_discreteness = |target_fps, animation_duration: Duration| -> usize {
+            target_fps * animation_duration.as_secs() as usize
+        };
+
+        let mut white_brightness = u8::MIN;
+        let mut target_delay = calc_delay(self.config.target_fps);
+        let mut i = WrappingIndex {
+            val: 0,
+            wrap_at: calc_discreteness(self.config.target_fps, self.config.animation_duration),
+        };
+        let mut last_update = Instant::now();
 
         loop {
             match rx.try_recv() {
@@ -108,39 +111,62 @@ impl LedStripAnimation {
                     Messages::NewConfig(conf) => {
                         self.config.update(conf);
                         applied_config_tx.send(self.config)?;
-                        gradient_discreteness = self.config.target_fps
-                            * self.config.animation_duration.as_secs() as usize;
-                        target_delay = Duration::from_millis(1000 / self.config.target_fps as u64);
-                    } // Messages::GetConfig => applied_config_tx.send(self.config)?,
+                        i.wrap_at = calc_discreteness(
+                            self.config.target_fps,
+                            self.config.animation_duration,
+                        );
+                        target_delay = calc_delay(self.config.target_fps);
+                    }
+                    Messages::SetWhite(value) => white_brightness = value,
                 },
                 Err(TryRecvError::Disconnected) => bail!("Unexpected channel closing"),
                 Err(TryRecvError::Empty) => (),
             }
 
-            let write_start = std::time::Instant::now();
+            if last_update.elapsed() >= target_delay {
+                let color = gradient
+                    .eval_rational(i.val, i.wrap_at)
+                    .apply_brightness(self.config.rgb_brightness);
+                self.set_color(RGBW::from((
+                    color.r,
+                    color.g,
+                    color.b,
+                    White(white_brightness),
+                )))?;
 
-            let color = gradient.eval_rational(i, gradient_discreteness);
-            let mut rgbw = RGBW::from((
-                color.r,
-                color.g,
-                color.b,
-                White(self.config.white_brightness),
-            ));
-
-            rgbw.r /= u8::MAX / self.config.brightness;
-            rgbw.g /= u8::MAX / self.config.brightness;
-            rgbw.b /= u8::MAX / self.config.brightness;
-
-            self.set_color(rgbw)?;
-
-            // Smart delay
-            if write_start.elapsed() < target_delay {
-                std::thread::sleep(target_delay - write_start.elapsed());
+                last_update = Instant::now();
+                i.increment();
             }
-            i += 1;
-            if i >= gradient_discreteness {
-                i = 0;
-            }
+        }
+    }
+}
+
+trait SetBrightness {
+    fn apply_brightness(self, brightness: u8) -> Self;
+}
+
+impl SetBrightness for colorous::Color {
+    fn apply_brightness(mut self, brightness: u8) -> Self {
+        let apply_alpha = |v: u8, a: u8| (v as f32 * (a as f32 / u8::MAX as f32)) as u8;
+
+        self.r = apply_alpha(self.r, brightness);
+        self.g = apply_alpha(self.g, brightness);
+        self.b = apply_alpha(self.b, brightness);
+        self
+    }
+}
+
+struct WrappingIndex {
+    val: usize,
+    wrap_at: usize,
+}
+
+impl WrappingIndex {
+    fn increment(&mut self) {
+        if self.val < self.wrap_at {
+            self.val += 1;
+        } else {
+            self.val = 0;
         }
     }
 }

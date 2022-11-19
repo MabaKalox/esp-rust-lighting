@@ -24,12 +24,26 @@ pub fn web_server(
             Err(WrapError("Boo, something happened!").into())
         })?
         .handle_put("/set_conf", {
+            let tx = tx.clone();
             move |req, resp| {
                 let new_config: ReceivedAnimationConfig = serde_qs::from_str(req.query_string())?;
                 tx.send(Messages::NewConfig(new_config))?;
 
-                // Will block, but not for long, as
                 resp.send_str(&format!("{:?}", applied_config_rx.recv()))?;
+
+                Ok(())
+            }
+        })?
+        .handle_put("/set_white", {
+            let tx = tx.clone();
+            move |req, _resp| {
+                let white_brightness = url::form_urlencoded::parse(req.query_string().as_bytes())
+                    .filter(|p| p.0 == "value")
+                    .map(|p| str::parse::<u8>(&p.1))
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("No parameter value"))??;
+
+                tx.send(Messages::SetWhite(white_brightness))?;
 
                 Ok(())
             }
