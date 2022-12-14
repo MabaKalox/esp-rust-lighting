@@ -1,5 +1,9 @@
+use super::esp_random::EspRand;
 use crate::RGBA;
+use animation_lang::program::Program;
+use animation_lang::vm::{VMState, VMStateConfig, VM};
 use anyhow::{anyhow, bail, Result};
+use enum_assoc::Assoc;
 use esp_idf_hal::gpio::OutputPin;
 use serde::Deserialize;
 use smart_leds_trait::{SmartLedsWrite, White, RGBW};
@@ -17,6 +21,7 @@ pub struct AnimationConfig {
     pub animation_duration: Duration,
     pub target_fps: usize,
     pub rgb_brightness: u8,
+    pub gradient: Gradient,
 }
 
 #[derive(Default, PartialEq, Deserialize)]
@@ -27,6 +32,7 @@ pub struct ReceivedAnimationConfig {
     pub animation_duration: Option<Duration>,
     pub target_fps: Option<usize>,
     pub rgb_brightness: Option<u8>,
+    pub gradient: Option<Gradient>,
 }
 
 impl Default for AnimationConfig {
@@ -36,12 +42,14 @@ impl Default for AnimationConfig {
             animation_duration: Duration::from_secs(20),
             target_fps: 60,
             rgb_brightness: u8::MAX,
+            gradient: Default::default(),
         }
     }
 }
 
 pub enum Messages {
     NewConfig(ReceivedAnimationConfig),
+    NewProg(Program),
     SetWhite(u8), // GetConfig,
 }
 
@@ -59,12 +67,34 @@ impl AnimationConfig {
         if let Some(new_val) = new_config.animation_duration {
             self.animation_duration = new_val;
         }
+        if let Some(new_val) = new_config.gradient {
+            self.gradient = new_val;
+        }
     }
 }
 
 pub struct LedStripAnimation {
     ws2812: Ws2812I,
     config: AnimationConfig,
+}
+
+#[derive(Assoc, Deserialize, Default, PartialEq, Debug, Clone, Copy)]
+#[func(pub const fn val(&self) -> colorous::Gradient)]
+pub enum Gradient {
+    #[default]
+    #[assoc(val = colorous::SINEBOW)]
+    Sinebow,
+    #[assoc(val = colorous::RAINBOW)]
+    Rainbow,
+    #[assoc(val = colorous::CUBEHELIX)]
+    Cubehelix,
+    #[assoc(val = colorous::COOL)]
+    Cool,
+}
+
+enum VmStatus {
+    Running(VMState),
+    Stoped((VM, VMStateConfig)),
 }
 
 impl LedStripAnimation {
@@ -81,12 +111,12 @@ impl LedStripAnimation {
     pub fn set_color(&mut self, color: RGBA<u8, White<u8>>) -> Result<()> {
         let pixels = std::iter::repeat(color).take(self.config.led_quantity);
         self.ws2812.write(pixels)?;
+
         Ok(())
     }
 
     pub fn led_strip_loop(
         &mut self,
-        gradient: colorous::Gradient,
         rx: Receiver<Messages>,
         applied_config_tx: SyncSender<AnimationConfig>,
     ) -> Result<()> {
@@ -104,6 +134,16 @@ impl LedStripAnimation {
             wrap_at: calc_discreteness(self.config.target_fps, self.config.animation_duration),
         };
         let mut last_update = Instant::now();
+        let mut last_check = Instant::now();
+
+        let mut vm_status = VmStatus::Stoped((
+            VM::new(self.config.led_quantity, Default::default()),
+            VMStateConfig {
+                local_instruction_limit: Some(1_000_000),
+                rng: Box::new(EspRand {}),
+                ..Default::default()
+            },
+        ));
 
         loop {
             match rx.try_recv() {
@@ -116,27 +156,91 @@ impl LedStripAnimation {
                             self.config.animation_duration,
                         );
                         target_delay = calc_delay(self.config.target_fps);
+
+                        match vm_status {
+                            VmStatus::Running(vm_state) => {
+                                let (vm, cfg, _) = vm_state.stop();
+                                vm_status = VmStatus::Stoped((vm, cfg));
+                            }
+                            VmStatus::Stoped(_) => (),
+                        }
                     }
                     Messages::SetWhite(value) => white_brightness = value,
+                    Messages::NewProg(prog) => {
+                        vm_status = VmStatus::Running(match vm_status {
+                            VmStatus::Running(vm_state) => {
+                                let (vm, cfg, _) = vm_state.stop();
+                                vm.start(prog, cfg)
+                            }
+                            VmStatus::Stoped((vm, cfg)) => vm.start(prog, cfg),
+                        });
+                    }
                 },
                 Err(TryRecvError::Disconnected) => bail!("Unexpected channel closing"),
                 Err(TryRecvError::Empty) => (),
             }
 
-            if last_update.elapsed() >= target_delay {
-                let color = gradient
-                    .eval_rational(i.val, i.wrap_at)
-                    .apply_brightness(self.config.rgb_brightness);
-                self.set_color(RGBW::from((
-                    color.r,
-                    color.g,
-                    color.b,
-                    White(white_brightness),
-                )))?;
+            if last_check.elapsed() > Duration::from_secs(1) {
+                let high_water_mark =
+                    unsafe { esp_idf_sys::uxTaskGetStackHighWaterMark(std::ptr::null_mut()) };
 
-                last_update = Instant::now();
-                i.increment();
+                println!(
+                    "Animation thread stack high water mark: {}",
+                    high_water_mark
+                );
+
+                last_check = Instant::now();
             }
+
+            if last_update.elapsed() >= target_delay {
+                match vm_status {
+                    VmStatus::Running(mut vm_state) => {
+                        vm_status = match vm_state.next() {
+                            None => {
+                                println!("Program ended");
+                                println!("Halting VM and Waiting for new prog...");
+                                let (vm, cfg, _) = vm_state.stop();
+                                VmStatus::Stoped((vm, cfg))
+                            }
+                            Some(Err(e)) => {
+                                eprintln!("{:?}", e);
+                                println!("Halting VM and Waiting for new prog...");
+                                let (vm, cfg, _) = vm_state.stop();
+                                VmStatus::Stoped((vm, cfg))
+                            }
+                            Some(Ok(v)) => {
+                                self.ws2812.write(v.map(|mut c| {
+                                    c.set_alpha(white_brightness);
+                                    c
+                                }))?;
+                                VmStatus::Running(vm_state)
+                            }
+                        }
+                    }
+                    VmStatus::Stoped(_) => {
+                        let color = self
+                            .config
+                            .gradient
+                            .val()
+                            .eval_rational(
+                                (i.val as isize - i.wrap_at as isize / 2).unsigned_abs(),
+                                i.wrap_at / 2,
+                            )
+                            .apply_brightness(self.config.rgb_brightness);
+                        self.set_color(RGBW::from((
+                            color.r,
+                            color.g,
+                            color.b,
+                            White(white_brightness),
+                        )))?;
+                        i.increment();
+
+                        last_update = Instant::now();
+                    }
+                }
+            }
+
+            std::thread::sleep(Duration::from_millis(5));
         }
     }
 }

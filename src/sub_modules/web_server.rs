@@ -23,7 +23,7 @@ pub fn web_server(
         .handle_get("/foo", |_req, _resp| {
             Err(WrapError("Boo, something happened!").into())
         })?
-        .handle_put("/set_conf", {
+        .handle_get("/set_conf", {
             let tx = tx.clone();
             move |req, resp| {
                 let new_config: ReceivedAnimationConfig = serde_qs::from_str(req.query_string())?;
@@ -34,7 +34,7 @@ pub fn web_server(
                 Ok(())
             }
         })?
-        .handle_put("/set_white", {
+        .handle_get("/set_white", {
             let tx = tx.clone();
             move |req, _resp| {
                 let white_brightness = url::form_urlencoded::parse(req.query_string().as_bytes())
@@ -48,6 +48,13 @@ pub fn web_server(
                 Ok(())
             }
         })?
+        // .handle_post("/set_prog", {
+        //     let tx = tx.clone();
+        //     move |req, _resp| {
+        //         let smth = req.reader();
+        //         Ok(())
+        //     }
+        // })?
         .handle_get("/bar", |_req, resp| {
             resp.status(403)
                 .status_message("No permissions")

@@ -32,6 +32,9 @@ thiserror = "1.0.37"
 serde_qs = "0.10.1"
 serde = { version = "1.0.147", features = ["derive"] }
 humantime-serde = "1.1.1"
+enum-assoc = "0.4.0"
+animation-lang = { path = "../animation_lang" }
+rand = "0.8.5"
 
 [build-dependencies]
 embuild = "0.30"

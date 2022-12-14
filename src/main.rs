@@ -1,6 +1,6 @@
 #![feature(nonzero_min_max)]
 
-use anyhow::Ok;
+use animation_lang::program::Program;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_svc::{
     http::{
@@ -29,7 +29,11 @@ use esp_idf_svc::{
 use esp_idf_sys::{self as _}; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
 use log::info;
 use smart_leds_trait::RGBA;
-use std::sync::mpsc;
+use std::{
+    io::{self, Read as StdRead},
+    net::TcpListener,
+    sync::mpsc,
+};
 use std::{sync::Arc, time::Duration};
 
 mod sub_modules;
@@ -87,13 +91,27 @@ fn main() -> anyhow::Result<()> {
     let (tx, rx) = mpsc::sync_channel(0);
     let (applied_config_tx, applied_config_rx) = mpsc::sync_channel(0);
 
-    let _httpd = web_server(tx, applied_config_rx)?;
+    let _httpd = web_server(tx.clone(), applied_config_rx)?;
 
-    let led_strip_thead = std::thread::spawn(move || {
-        let mut ws2812 = LedStripAnimation::new(pins.gpio6, 0, Default::default()).unwrap();
+    let led_strip_thead = std::thread::Builder::new()
+        .stack_size(4 * 1024)
+        .spawn(move || {
+            let mut ws2812 = LedStripAnimation::new(pins.gpio6, 0, Default::default()).unwrap();
 
-        ws2812.led_strip_loop(colorous::SINEBOW, rx, applied_config_tx)
-    });
+            ws2812.led_strip_loop(rx, applied_config_tx)
+        })?;
+
+    let mut listener = TcpListener::bind("0.0.0.0:8888").unwrap();
+    listener.set_nonblocking(true).unwrap();
+
+    loop {
+        if let Some(new_prog) = check_tcp(&mut listener) {
+            tx.send(sub_modules::led_strip_animations::Messages::NewProg(
+                Program::from_binary(new_prog),
+            ))?;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
 
     println!("Starting to wait for thread");
     led_strip_thead.join().unwrap()?;
@@ -230,4 +248,17 @@ fn get(url: &str) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn check_tcp(listener: &mut TcpListener) -> Option<Vec<u8>> {
+    match listener.accept() {
+        Ok(mut stream) => {
+            println!("Receiving new program");
+            let mut new_prog = Vec::new();
+            stream.0.read_to_end(&mut new_prog).unwrap();
+            Some(new_prog)
+        }
+        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => None,
+        Err(e) => Err(e).unwrap(),
+    }
 }
