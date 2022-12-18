@@ -13,12 +13,7 @@ impl RngCore for EspRand {
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        unsafe {
-            esp_fill_random(
-                dest.as_mut_ptr() as *mut std::ffi::c_void,
-                dest.len() as u32,
-            )
-        }
+        unsafe { esp_fill_random(dest.as_mut_ptr() as *mut std::ffi::c_void, dest.len()) }
     }
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
