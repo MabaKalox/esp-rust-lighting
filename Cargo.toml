@@ -29,7 +29,7 @@ thiserror = "1.0.37"
 serde = { version = "1.0.147", features = ["derive"] }
 rand = "0.8.5"
 base64 = "0.20.0"
-animation-lang = { path = "../animation_lang" }
+animation-lang = { git = "https://github.com/MabaKalox/animation-lang.git" }
 serde_urlencoded = "0.7.1"
 form_urlencoded = "1.1.0"
 

@@ -1,7 +1,6 @@
 /.vscode
 /.embuild
 /target
-/Cargo.lock
 /.idea
 
 cfg.toml
