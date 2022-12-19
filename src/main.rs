@@ -9,7 +9,6 @@ use embedded_svc::{
 };
 use esp_idf_hal::gpio;
 use esp_idf_hal::{peripheral, peripherals::Peripherals};
-use esp_idf_svc::timer::EspTimer;
 use esp_idf_svc::timer::EspTimerService;
 use esp_idf_svc::wifi::WifiEvent;
 use esp_idf_svc::{
@@ -23,8 +22,6 @@ use esp_idf_svc::{
 use esp_idf_sys::{self as _}; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
 use log::info;
 use std::sync::mpsc;
-use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::Duration;
 
 mod sub_modules;
@@ -39,6 +36,9 @@ struct TConfig {
 
     #[default("some_pass")]
     wifi_pass: &'static str,
+
+    #[default("error")]
+    log_level: &'static str,
 }
 
 fn main() -> Result<()> {
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
 
     // Bind the log crate to the ESP Logging facilities
     EspLogger::initialize_default();
-    EspLogger.set_target_level("*", log::LevelFilter::Debug);
+    EspLogger.set_target_level("*", T_CONFIG.log_level.parse_loglevel().unwrap());
 
     let peripherals = Peripherals::take().unwrap();
     let pins = peripherals.pins;
@@ -77,8 +77,6 @@ fn main() -> Result<()> {
     sntp.wait_status_with_timeout(Duration::from_secs(10), |status| {
         *status == SyncStatus::Completed
     })?;
-
-    println!("Time is: {:?}", std::time::Instant::now());
 
     led1.set_low()?;
     led2.set_low()?;
@@ -185,4 +183,22 @@ fn wifi(
     ping(ip_info.subnet.gateway)?;
 
     Ok(wifi)
+}
+
+trait IntoLogLevel {
+    fn parse_loglevel(&self) -> Result<log::LevelFilter>;
+}
+
+impl IntoLogLevel for str {
+    fn parse_loglevel(&self) -> Result<log::LevelFilter> {
+        Ok(match self {
+            "off" => log::LevelFilter::Off,
+            "error" => log::LevelFilter::Error,
+            "warn" => log::LevelFilter::Warn,
+            "info" => log::LevelFilter::Info,
+            "trace" => log::LevelFilter::Trace,
+            "debug" => log::LevelFilter::Debug,
+            _ => bail!("Incorrect log level"),
+        })
+    }
 }

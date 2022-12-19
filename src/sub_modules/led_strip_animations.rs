@@ -1,8 +1,9 @@
 use super::esp_random::EspRand;
 use animation_lang::program::Program;
 use animation_lang::vm::{VMState, VMStateConfig, VM};
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use esp_idf_hal::gpio::OutputPin;
+use log::{error, info};
 use serde::Deserialize;
 use smart_leds_trait::{SmartLedsWrite, White};
 use std::sync::mpsc::Receiver;
@@ -104,7 +105,7 @@ impl LedStripAnimation {
 
                         match vm_status {
                             VmStatus::Running(vm_state) => {
-                                println!("Restarting vm");
+                                info!("Restarting vm");
                                 let (mut vm, cfg, prog) = vm_state.stop();
                                 vm.set_stip_length(self.config.led_quantity);
                                 vm_status = VmStatus::Running(vm.start(prog, cfg));
@@ -114,6 +115,7 @@ impl LedStripAnimation {
                     }
                     Messages::SetWhite(value) => white_brightness = value,
                     Messages::NewProg(prog) => {
+                        info!("Recieved new program");
                         vm_status = VmStatus::Running(match vm_status {
                             VmStatus::Running(vm_state) => {
                                 let (vm, cfg, _) = vm_state.stop();
@@ -144,14 +146,14 @@ impl LedStripAnimation {
                 if let VmStatus::Running(mut vm_state) = vm_status {
                     vm_status = match vm_state.next() {
                         None => {
-                            println!("Program ended");
-                            println!("Halting VM and Waiting for new prog...");
+                            info!("Program ended");
+                            info!("Halting VM and Waiting for new prog...");
                             let (vm, cfg, _) = vm_state.stop();
                             VmStatus::Stoped((vm, cfg))
                         }
                         Some(Err(e)) => {
-                            eprintln!("{:?}", e);
-                            println!("Halting VM and Waiting for new prog...");
+                            error!("{:?}", e);
+                            info!("Halting VM and Waiting for new prog...");
                             let (vm, cfg, _) = vm_state.stop();
                             VmStatus::Stoped((vm, cfg))
                         }

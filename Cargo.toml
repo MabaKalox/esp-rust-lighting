@@ -26,12 +26,12 @@ log = "0.4.17"
 smart-leds-trait = "0.2.1"
 ws2812-esp32-rmt-driver = "0.4.0"
 thiserror = "1.0.37"
-serde_qs = "0.10.1"
 serde = { version = "1.0.147", features = ["derive"] }
 rand = "0.8.5"
 base64 = "0.20.0"
 animation-lang = { path = "../animation_lang" }
-url = "2.3.1"
+serde_urlencoded = "0.7.1"
+form_urlencoded = "1.1.0"
 
 [build-dependencies]
 embuild = "0.31.0"
