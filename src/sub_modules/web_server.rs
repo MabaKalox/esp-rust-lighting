@@ -17,7 +17,7 @@ static CORS_HEADERS: &[(&str, &str)] = &[
     ("Access-Control-Max-Age", "600"),
 ];
 
-static WASM_BLOB: &[u8] = include_bytes!("../../webblob/wasm_animation_lang_bg.wasm");
+static WASM_BLOB: &[u8] = include_bytes!("../../webblob/wasm_blob");
 static HTML_BLOB: &[u8] = include_bytes!("../../webblob/index.html");
 
 trait QueryStr {
