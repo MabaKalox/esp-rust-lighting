@@ -363,7 +363,7 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
 })();</script>
 <!-- Note the usage of `type=module` here as this is an ES6 module -->
 <script type="module">
-    const { compile_prog } = wasm_bindgen;
+    const {compile_prog} = wasm_bindgen;
 
     async function run() {
         let wasm_response = await fetch("./wasm_blob");
@@ -390,13 +390,27 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
                     source_code_el.style.borderColor = "green"
                     send_prog_btn_el.disabled = false;
                     send_prog_btn_el.style.backgroundColor = "green";
-                    send_prog_btn_el.onclick = async () => await send_prog(compile_res_tuple[0]);
+                    send_prog_btn_el.textContent = "Send";
+                    send_prog_btn_el.onclick = () => {
+                        send_prog_btn_el.textContent = "Sending...";
+                        send_prog_btn_el.style.backgroundColor = "gray";
+                        send_prog(compile_res_tuple[0]).then((response) => {
+                            send_prog_btn_el.textContent = "Success";
+                            send_prog_btn_el.style.backgroundColor = "green";
+                        }).catch(
+                            () => {
+                                send_prog_btn_el.style.backgroundColor = "red";
+                                send_prog_btn_el.textContent = "Failed";
+                            }
+                        )
+                    };
                 } catch (e) {
                     disassembly_el.innerText = e;
                     source_code_el.style.borderColor = "red"
                     send_prog_btn_el.disabled = true;
                     send_prog_btn_el.style.backgroundColor = "gray";
-                    send_prog_btn_el.onclick = () => {};
+                    send_prog_btn_el.onclick = () => {
+                    };
                 }
             }
 
@@ -406,12 +420,13 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
             console.error(wasm_response);
         }
     }
+
     document.addEventListener('DOMContentLoaded', (event) => {
         run();
     })
 </script>
 <div id="container">
-    <button id="send_prog_btn">Send</button>
+    <button id="send_prog_btn">Send</span></button>
     <textarea id="source_code" name="source_code" placeholder="Write prog here"></textarea>
     <div id="disassembly" style="font-family: monospace;"></div>
 </div>
