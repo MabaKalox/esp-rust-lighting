@@ -4,25 +4,39 @@
     <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
     <style>
         #container {
+            box-sizing: border-box;
             display: grid;
-            grid-template-columns: 2fr 1fr;
-            height: 50vh;
+            height: 100%;
+            width: 100%;
+            overflow: auto;
             gap: 10px;
-            grid-template-rows: min-content 100%;
+            grid-template-rows: min-content minmax(50vh, 50%) min-content;
             grid-template-areas:
+                "send_prog_btn"
+                "source_code"
+                "disassembly";
+        }
+
+        @media (min-width: 1025px) {
+            #container {
+                grid-template-rows: min-content auto;
+                grid-template-columns: 2fr 1fr;
+                grid-template-areas:
                 "source_code send_prog_btn"
                 "source_code disassembly";
+            }
         }
 
         #disassembly {
             overflow: scroll;
-            width: 100%;
+            box-sizing: border-box;
             border: 1px solid gray;
             padding: 10px;
             grid-area: disassembly;
         }
 
         #source_code {
+            box-sizing: border-box;
             white-space: pre;
             overflow-wrap: normal;
             overflow-x: scroll;
@@ -33,6 +47,7 @@
             border: 1px solid gray;
             resize: none;
             grid-area: source_code;
+            text-transform: lowercase;
         }
 
         #send_prog_btn {
@@ -40,6 +55,7 @@
             background-color: gray;
         }
     </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
 <body>
@@ -383,6 +399,22 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
                 })
             }
 
+            source_code_el.addEventListener('keydown', function (e) {
+                if (e.key == 'Tab') {
+                    e.preventDefault();
+                    var start = this.selectionStart;
+                    var end = this.selectionEnd;
+
+                    // set textarea value to: text before caret + two tabs + text after caret
+                    this.value = this.value.substring(0, start) +
+                        "  " + this.value.substring(end);
+
+                    // put caret at right position again
+                    this.selectionStart =
+                        this.selectionEnd = start + 2;
+                }
+            })
+
             const try_compile = (source_code) => {
                 try {
                     let compile_res_tuple = compile_prog(source_code);
@@ -414,8 +446,8 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
                 }
             }
 
-            source_code_el.oninput = (event) => try_compile(event.target.value)
-            try_compile(source_code_el.value)
+            source_code_el.oninput = (event) => try_compile(event.target.value.toLowerCase())
+            try_compile(source_code_el.value.toLowerCase())
         } else {
             console.error(wasm_response);
         }
@@ -431,5 +463,4 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
     <div id="disassembly" style="font-family: monospace;"></div>
 </div>
 </body>
-
 </html>
