@@ -10,13 +10,6 @@ use std::sync::mpsc::{Receiver, SyncSender};
 
 use super::led_strip_animations::ReceivedAnimationConfig;
 
-static CORS_HEADERS: &[(&str, &str)] = &[
-    ("Access-Control-Allow-Origin", "*"),
-    ("Access-Control-Allow-Headers", "*"),
-    ("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS"),
-    ("Access-Control-Max-Age", "600"),
-];
-
 static WASM_BLOB: &[u8] = include_bytes!("../../webblob/wasm_blob");
 static HTML_BLOB: &[u8] = include_bytes!("../../webblob/index.html");
 
@@ -33,16 +26,6 @@ impl QueryStr for str {
     }
 }
 
-fn add_cors(server: &mut EspHttpServer, endpoint: &str) -> anyhow::Result<()> {
-    server.fn_handler(endpoint, Method::Options, |req| {
-        req.into_response(200, None, CORS_HEADERS)?;
-
-        Ok(())
-    })?;
-
-    Ok(())
-}
-
 pub fn web_server(
     tx: SyncSender<Messages>,
     applied_config_rx: Receiver<AnimationConfig>,
@@ -56,7 +39,8 @@ pub fn web_server(
     })?;
 
     server.fn_handler("/wasm_blob", Method::Get, |req| {
-        req.into_ok_response()?.write_all(WASM_BLOB)?;
+        req.into_response(200, None, &[("Content-Type", "application/wasm")])?
+            .write_all(WASM_BLOB)?;
 
         Ok(())
     })?;
@@ -70,12 +54,16 @@ pub fn web_server(
                     Some(pair) => match str::parse::<u8>(&pair.1) {
                         Ok(v) => v,
                         Err(e) => {
-                            req.into_response(400, Some(&e.to_string()), &[])?;
+                            let message = e.to_string();
+                            req.into_response(400, Some(&message), &[])?
+                                .write_all(message.as_bytes())?;
                             return Ok(());
                         }
                     },
                     None => {
-                        req.into_response(400, Some("missing query param: val"), &[])?;
+                        let message = "missing query param: val";
+                        req.into_response(400, Some(message), &[])?
+                            .write_all(message.as_bytes())?;
                         return Ok(());
                     }
                 };
@@ -92,7 +80,9 @@ pub fn web_server(
             let new_config: ReceivedAnimationConfig = match serde_urlencoded::from_str(query_str) {
                 Ok(cfg) => cfg,
                 Err(e) => {
-                    req.into_response(400, Some(&e.to_string()), &[])?;
+                    let message = e.to_string();
+                    req.into_response(400, Some(&message), &[])?
+                        .write_all(message.as_bytes())?;
                     return Ok(());
                 }
             };
@@ -104,7 +94,6 @@ pub fn web_server(
         }
     })?;
 
-    add_cors(&mut server, "/send_prog_base64")?;
     server.fn_handler("/send_prog_base64", Method::Post, {
         #[allow(clippy::redundant_clone)]
         let tx = tx.clone();
@@ -114,14 +103,16 @@ pub fn web_server(
             let bin_prog = match base64::decode(body) {
                 Ok(bin_prog) => bin_prog,
                 Err(e) => {
-                    req.into_response(400, Some(&e.to_string()), CORS_HEADERS)?;
+                    let message = e.to_string();
+                    req.into_response(400, Some(&message), &[])?
+                        .write_all(message.as_bytes())?;
                     return Ok(());
                 }
             };
 
             tx.send(Messages::NewProg(Program::from_binary(bin_prog)))?;
 
-            req.into_response(200, None, CORS_HEADERS)?;
+            req.into_response(200, None, &[])?;
             Ok(())
         }
     })?;

@@ -19,8 +19,9 @@ use esp_idf_svc::{
     sntp::SyncStatus,
     wifi::{EspWifi, WifiWait},
 };
-use esp_idf_sys::{self as _}; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
+use esp_idf_sys::{self as _, esp}; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
 use log::info;
+use std::ffi::CString;
 use std::sync::mpsc;
 use std::time::Duration;
 
@@ -39,6 +40,12 @@ struct TConfig {
 
     #[default("error")]
     log_level: &'static str,
+
+    #[default("rust_led_strip")]
+    mdns_hostname: &'static str,
+
+    #[default("Led Strip Micro Controller with Rust firmware!")]
+    mdns_instance_name: &'static str,
 }
 
 fn main() -> Result<()> {
@@ -61,6 +68,7 @@ fn main() -> Result<()> {
 
     let sysloop = EspSystemEventLoop::take()?;
 
+    init_mdns()?;
     let mut wifi = wifi(peripherals.modem, sysloop.clone()).unwrap(); // Panic if wifi connection failed
     let _wifi_reconnect_subscription = sysloop.subscribe({
         let timer = EspTimerService::new()?.timer(move || wifi.connect().unwrap())?;
@@ -76,7 +84,8 @@ fn main() -> Result<()> {
     let sntp = EspSntpWrapper::new_default()?;
     sntp.wait_status_with_timeout(Duration::from_secs(10), |status| {
         *status == SyncStatus::Completed
-    })?;
+    })
+    .unwrap();
 
     led1.set_low()?;
     led2.set_low()?;
@@ -201,4 +210,27 @@ impl IntoLogLevel for str {
             _ => bail!("Incorrect log level"),
         })
     }
+}
+
+fn init_mdns() -> anyhow::Result<()> {
+    let cstr_mdns_hostname = CString::new(T_CONFIG.mdns_hostname)?;
+    let cstr_mdns_instance_name = CString::new(T_CONFIG.mdns_instance_name)?;
+    unsafe {
+        esp!(esp_idf_sys::mdns_init())?;
+
+        esp!(esp_idf_sys::mdns_hostname_set(cstr_mdns_hostname.as_ptr()))?;
+        esp!(esp_idf_sys::mdns_instance_name_set(
+            cstr_mdns_instance_name.as_ptr()
+        ))?;
+
+        esp!(esp_idf_sys::mdns_service_add(
+            std::ptr::null(),
+            CString::new("_http")?.as_ptr(),
+            CString::new("_tcp")?.as_ptr(),
+            80,
+            std::ptr::null_mut() as *mut esp_idf_sys::mdns_txt_item_t,
+            0
+        ))?;
+    }
+    Ok(())
 }
