@@ -15,13 +15,38 @@
             padding: 0;
         }
 
-        #container {
+        #root_container {
+            display: grid;
+            grid-template-areas:
+            "programming_tab_btn configuring_tab_btn"
+            "some_tab some_tab";
+            grid-template-rows: min-content auto;
+            height: 100%;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        #programming_tab_btn {
+            grid-area: programming_tab_btn;
+            background-color: orange;
+            color: white;
+        }
+
+        #configuring_tab_btn {
+            grid-area: configuring_tab_btn;
+            background-color: black;
+            color: white;
+        }
+
+        #programming_tab {
+            grid-area: some_tab;
             box-sizing: border-box;
             display: grid;
             height: 100%;
             width: 100%;
             overflow: auto;
-            padding: 10px;
             gap: 10px;
             grid-template-rows: min-content minmax(50vh, 50%) min-content;
             grid-template-areas:
@@ -30,8 +55,24 @@
                 "disassembly";
         }
 
+        #configuring_tab {
+            display: none;
+            grid-area: some_tab;
+            width: 100%;
+            height: 100%;
+            grid-template-areas:
+            "fps_label fps"
+            "led_quantity_label led_quantity"
+            "white_brightness_label white_brightness"
+            "send_conf_btn send_conf_btn"
+            "send_cfg_response send_cfg_response";
+            grid-template-rows: min-content min-content min-content min-content max-content;
+            grid-template-columns: min-content auto;
+            gap: 10px;
+        }
+
         @media (min-width: 1025px) {
-            #container {
+            #programming_tab {
                 grid-template-rows: min-content auto;
                 grid-template-columns: 2fr 1fr;
                 grid-template-areas:
@@ -48,20 +89,28 @@
             grid-area: disassembly;
         }
 
-        #source_code {
+        #source_code_container {
             box-sizing: border-box;
-            white-space: pre;
-            overflow-wrap: normal;
-            overflow-x: scroll;
-            outline: none;
             box-shadow: none;
             padding: 10px;
             margin: 0;
             border: 1px solid gray;
-            border-radius: 0;
-            resize: none;
             grid-area: source_code;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #source_code {
+            outline: none;
+            white-space: pre;
+            overflow-wrap: normal;
+            overflow-x: scroll;
+            border: none;
+            margin: 0;
+            resize: none;
             text-transform: lowercase;
+            height: 100%;
+            width: 100%;
         }
 
         #send_prog_btn {
@@ -71,6 +120,57 @@
             outline: none;
             box-shadow: none;
             color: white;
+        }
+
+        #gen_off_prog {
+            background-color: black;
+            margin: 0;
+            padding: 5px;
+            outline: none;
+            box-shadow: none;
+            color: white;
+            position: absolute;
+            right: 0;
+            top: 0;
+        }
+
+        #fps {
+            grid-area: fps;
+        }
+
+        #fps_label {
+            white-space: pre;
+            grid-area: fps_label;
+        }
+
+        #led_quantity {
+            grid-area: led_quantity;
+        }
+
+        #led_quantity_label {
+            white-space: pre;
+            grid-area: led_quantity_label;
+        }
+
+        #white_brightness {
+            grid-area: white_brightness;
+        }
+
+        #white_brightness_label {
+            white-space: pre;
+            grid-area: white_brightness_label;
+        }
+
+        #send_conf_btn {
+            grid-area: send_conf_btn;
+            background-color: green;
+        }
+
+        #send_cfg_response {
+            grid-area: send_cfg_response;
+            padding: 20px;
+            font-family: monospace;
+            border: 1px solid gray;
         }
     </style>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -405,7 +505,9 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
             await wasm_bindgen(wasm_response);
             const disassembly_el = document.getElementById("disassembly");
             const source_code_el = document.getElementById("source_code");
+            const source_code_container_el = document.getElementById("source_code_container");
             const send_prog_btn_el = document.getElementById("send_prog_btn");
+            const get_off_prog_btn = document.getElementById("gen_off_prog");
 
             const send_prog = async (bin_prog) => {
                 const base64_prog = btoa(String.fromCharCode(...bin_prog));
@@ -418,7 +520,7 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
             }
 
             source_code_el.addEventListener('keydown', function (e) {
-                if (e.key == 'Tab') {
+                if (e.key === 'Tab') {
                     e.preventDefault();
                     var start = this.selectionStart;
                     var end = this.selectionEnd;
@@ -437,7 +539,7 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
                 try {
                     let compile_res_tuple = compile_prog(source_code);
                     disassembly_el.innerText = compile_res_tuple[1];
-                    source_code_el.style.borderColor = "green"
+                    source_code_container_el.style.borderColor = "green"
                     send_prog_btn_el.disabled = false;
                     send_prog_btn_el.style.backgroundColor = "green";
                     send_prog_btn_el.textContent = "Send";
@@ -456,7 +558,7 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
                     };
                 } catch (e) {
                     disassembly_el.innerText = e;
-                    source_code_el.style.borderColor = "red"
+                    source_code_container_el.style.borderColor = "red"
                     send_prog_btn_el.disabled = true;
                     send_prog_btn_el.style.backgroundColor = "gray";
                     send_prog_btn_el.onclick = () => {
@@ -464,6 +566,14 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
                 }
             }
 
+            get_off_prog_btn.onclick = () => {
+                source_code_el.value = "loop{for(i=get_length) {set_pixel(i-1,0,0,0);};blit;}";
+                const event = new Event('input', {
+                    bubbles: true,
+                    cancelable: true,
+                });
+                source_code_el.dispatchEvent(event);
+            }
             source_code_el.oninput = (event) => try_compile(event.target.value.toLowerCase())
             try_compile(source_code_el.value.toLowerCase())
         } else {
@@ -473,12 +583,67 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
 
     document.addEventListener('DOMContentLoaded', (event) => {
         run();
+
+        const programming_tab_btn = document.getElementById("programming_tab_btn");
+        const programming_tab = document.getElementById("programming_tab");
+        const configuring_tab_btn = document.getElementById("configuring_tab_btn");
+        const configuring_tab = document.getElementById("configuring_tab");
+        const send_cfg_response_el = document.getElementById("send_cfg_response");
+
+        programming_tab_btn.onclick = () => {
+            programming_tab_btn.style.backgroundColor = "orange"
+            programming_tab.style.display = "grid";
+            configuring_tab_btn.style.backgroundColor = "black"
+            configuring_tab.style.display = "none";
+        }
+
+        configuring_tab_btn.onclick = () => {
+            programming_tab_btn.style.backgroundColor = "black"
+            programming_tab.style.display = "none";
+            configuring_tab_btn.style.backgroundColor = "orange"
+            configuring_tab.style.display = "grid";
+            console.log("gaga");
+        }
+
+        configuring_tab.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const data = new FormData(e.target);
+            const fps = data.get("fps");
+            const led_quantity = data.get("led_quantity");
+            const white_brightness = data.get("white_brightness");
+
+            let response = await fetch(
+                "./set_conf?" + new URLSearchParams(({
+                    fps: fps,
+                    led_quantity: led_quantity,
+                    white_brightness: white_brightness
+                })), {mode: "cors"}
+            )
+            send_cfg_response_el.innerText = await response.text();
+        });
     })
 </script>
-<div id="container">
-    <button id="send_prog_btn">Send</span></button>
-    <textarea id="source_code" name="source_code" placeholder="Write prog here"></textarea>
-    <div id="disassembly" style="font-family: monospace;"></div>
+<div id="root_container">
+    <button id="programming_tab_btn">Programming</button>
+    <button id="configuring_tab_btn">Configuring</button>
+    <div id="programming_tab">
+        <button id="send_prog_btn">Send</button>
+        <div id="source_code_container">
+            <button id="gen_off_prog">GEN OFF</button>
+            <textarea id="source_code" name="source_code" placeholder="Write prog here"></textarea>
+        </div>
+        <div id="disassembly" style="font-family: monospace;"></div>
+    </div>
+    <form id="configuring_tab" action="">
+        <label for="fps" id="fps_label">FPS:</label>
+        <input type="number" id="fps" name="fps" value="60">
+        <label for="led_quantity" id="led_quantity_label">Led quantity:</label>
+        <input type="number" id="led_quantity" name="led_quantity" value="150">
+        <label for="white_brightness" id="white_brightness_label">White brightness:</label>
+        <input type="range" min="0" max="255" id="white_brightness" name="white_brightness" value="0">
+        <input type="submit" id="send_conf_btn" value="Submit">
+        <div id="send_cfg_response">There would be response</div>
+    </form>
 </div>
 </body>
 

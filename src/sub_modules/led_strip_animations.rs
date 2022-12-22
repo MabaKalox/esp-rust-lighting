@@ -14,24 +14,30 @@ use ws2812_esp32_rmt_driver::{LedPixelEsp32Rmt, RGBW8};
 
 type Ws2812I = LedPixelEsp32Rmt<RGBW8, LedPixelColorGrbw32>;
 
+static LOOP_OFF_PROG: &[u8] = binary_macros::base64!("4FAPACARAYEQ4wFxQAEAAeRAAAA=");
+
 #[derive(Debug, Clone, Copy)]
 pub struct AnimationConfig {
-    pub led_quantity: usize,
-    pub target_fps: usize,
+    led_quantity: usize,
+    fps: usize,
+    white_brightness: u8,
 }
 
 #[derive(Default, PartialEq, Deserialize)]
 #[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct ReceivedAnimationConfig {
     pub led_quantity: Option<usize>,
-    pub target_fps: Option<usize>,
+    pub fps: Option<usize>,
+    pub white_brightness: Option<u8>,
 }
 
 impl Default for AnimationConfig {
     fn default() -> Self {
         Self {
             led_quantity: 150,
-            target_fps: 60,
+            fps: 60,
+            white_brightness: 0,
         }
     }
 }
@@ -39,16 +45,18 @@ impl Default for AnimationConfig {
 pub enum Messages {
     NewConfig(ReceivedAnimationConfig),
     NewProg(Program),
-    SetWhite(u8), // GetConfig,
 }
 
 impl AnimationConfig {
     pub fn update(&mut self, new_config: ReceivedAnimationConfig) {
-        if let Some(new_val) = new_config.target_fps {
-            self.target_fps = new_val;
+        if let Some(new_val) = new_config.fps {
+            self.fps = new_val;
         }
         if let Some(new_val) = new_config.led_quantity {
             self.led_quantity = new_val;
+        }
+        if let Some(new_val) = new_config.white_brightness {
+            self.white_brightness = new_val;
         }
     }
 }
@@ -81,19 +89,19 @@ impl LedStripAnimation {
 
         let calc_delay = |target_fps| Duration::from_millis(1000 / target_fps as u64);
 
-        let mut white_brightness = u8::MIN;
-        let mut target_delay = calc_delay(self.config.target_fps);
+        let mut target_delay = calc_delay(self.config.fps);
         let mut last_update = Instant::now();
         // let mut last_stack_check = Instant::now();
 
-        let mut vm_status = VmStatus::Stoped((
-            VM::new(self.config.led_quantity, Default::default()),
-            VMStateConfig {
-                local_instruction_limit: Some(1_000_000),
-                rng: Box::new(EspRand {}),
-                ..Default::default()
-            },
-        ));
+        let mut vm_status =
+            VmStatus::Running(VM::new(self.config.led_quantity, Default::default()).start(
+                Program::from_binary(LOOP_OFF_PROG.to_vec()),
+                VMStateConfig {
+                    local_instruction_limit: Some(1_000_000),
+                    rng: Box::new(EspRand {}),
+                    ..Default::default()
+                },
+            ));
 
         loop {
             match rx.try_recv() {
@@ -101,7 +109,7 @@ impl LedStripAnimation {
                     Messages::NewConfig(conf) => {
                         self.config.update(conf);
                         applied_config_tx.send(self.config)?;
-                        target_delay = calc_delay(self.config.target_fps);
+                        target_delay = calc_delay(self.config.fps);
 
                         match vm_status {
                             VmStatus::Running(vm_state) => {
@@ -113,7 +121,6 @@ impl LedStripAnimation {
                             VmStatus::Stoped(_) => (),
                         }
                     }
-                    Messages::SetWhite(value) => white_brightness = value,
                     Messages::NewProg(prog) => {
                         info!("Recieved new program");
                         vm_status = VmStatus::Running(match vm_status {
@@ -159,7 +166,7 @@ impl LedStripAnimation {
                         }
                         Some(Ok(v)) => {
                             self.ws2812.write(v.map(|c| {
-                                RGBW8::new_alpha(c.r, c.g, c.b, White(white_brightness))
+                                RGBW8::new_alpha(c.r, c.g, c.b, White(self.config.white_brightness))
                             }))?;
                             VmStatus::Running(vm_state)
                         }

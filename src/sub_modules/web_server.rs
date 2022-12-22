@@ -45,34 +45,6 @@ pub fn web_server(
         Ok(())
     })?;
 
-    server.fn_handler("/set_white", Method::Get, {
-        let tx = tx.clone();
-        move |req| {
-            let query_str = req.uri().query_str().unwrap_or_default();
-            let white_brightness =
-                match form_urlencoded::parse(query_str.as_bytes()).find(|pair| pair.0 == "val") {
-                    Some(pair) => match str::parse::<u8>(&pair.1) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            let message = e.to_string();
-                            req.into_response(400, Some(&message), &[])?
-                                .write_all(message.as_bytes())?;
-                            return Ok(());
-                        }
-                    },
-                    None => {
-                        let message = "missing query param: val";
-                        req.into_response(400, Some(message), &[])?
-                            .write_all(message.as_bytes())?;
-                        return Ok(());
-                    }
-                };
-
-            tx.send(Messages::SetWhite(white_brightness))?;
-            Ok(())
-        }
-    })?;
-
     server.fn_handler("/set_conf", Method::Get, {
         let tx = tx.clone();
         move |req| {

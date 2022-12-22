@@ -212,7 +212,7 @@ impl IntoLogLevel for str {
     }
 }
 
-fn init_mdns() -> anyhow::Result<()> {
+fn init_mdns() -> Result<()> {
     let cstr_mdns_hostname = CString::new(T_CONFIG.mdns_hostname)?;
     let cstr_mdns_instance_name = CString::new(T_CONFIG.mdns_instance_name)?;
     unsafe {
