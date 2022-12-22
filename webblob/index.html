@@ -24,20 +24,24 @@
             height: 100%;
             width: 100%;
             box-sizing: border-box;
-            padding: 10px;
-            gap: 10px;
+            padding: 5px;
+            gap: 5px;
         }
 
         #programming_tab_btn {
             grid-area: programming_tab_btn;
             background-color: orange;
             color: white;
+            border: none;
+            padding: 5px;
         }
 
         #configuring_tab_btn {
             grid-area: configuring_tab_btn;
             background-color: black;
             color: white;
+            border: none;
+            padding: 5px;
         }
 
         #programming_tab {
@@ -47,12 +51,13 @@
             height: 100%;
             width: 100%;
             overflow: auto;
-            gap: 10px;
+            gap: 5px;
+            grid-template-columns: auto min-content;
             grid-template-rows: min-content minmax(50vh, 50%) min-content;
             grid-template-areas:
-                "send_prog_btn"
-                "source_code"
-                "disassembly";
+                "send_prog_btn send_prog_btn"
+                "source_code saved_progs"
+                "disassembly disassembly";
         }
 
         #configuring_tab {
@@ -68,16 +73,16 @@
             "send_cfg_response send_cfg_response";
             grid-template-rows: min-content min-content min-content min-content max-content;
             grid-template-columns: min-content auto;
-            gap: 10px;
+            gap: 5px;
         }
 
         @media (min-width: 1025px) {
             #programming_tab {
                 grid-template-rows: min-content auto;
-                grid-template-columns: 2fr 1fr;
+                grid-template-columns: 2fr max-content 1fr;
                 grid-template-areas:
-                    "source_code send_prog_btn"
-                    "source_code disassembly";
+                    "source_code saved_progs send_prog_btn"
+                    "source_code saved_progs disassembly";
             }
         }
 
@@ -85,32 +90,72 @@
             overflow: scroll;
             box-sizing: border-box;
             border: 1px solid gray;
-            padding: 10px;
+            padding: 5px;
             grid-area: disassembly;
-        }
-
-        #source_code_container {
-            box-sizing: border-box;
-            box-shadow: none;
-            padding: 10px;
-            margin: 0;
-            border: 1px solid gray;
-            grid-area: source_code;
-            position: relative;
-            overflow: hidden;
+            word-break: break-all;
         }
 
         #source_code {
-            outline: none;
+            box-sizing: border-box;
             white-space: pre;
             overflow-wrap: normal;
             overflow-x: scroll;
-            border: none;
+            outline: none;
+            box-shadow: none;
+            padding: 5px;
             margin: 0;
+            border: 1px solid gray;
+            border-radius: 0;
             resize: none;
+            grid-area: source_code;
             text-transform: lowercase;
+        }
+
+        #saved_progs {
+            grid-area: saved_progs;
+            margin: 0;
+            border: 1px solid gray;
+            display: flex;
+            flex-direction: column;
             height: 100%;
-            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #saved_progs > .save_btn {
+            padding: 5px;
+            outline: none;
+            box-shadow: none;
+            border: none;
+            background-color: crimson;
+            border-bottom: 1px solid gray;
+            color: white;
+        }
+
+        #saved_progs > .description {
+            padding: 5px;
+            overflow-y: scroll;
+            text-align: center;
+        }
+
+        #saved_progs > .list {
+            display: grid;
+            grid-template-columns: auto min-content;
+        }
+
+        #saved_progs > .list > .apply_btn {
+            padding: 5px;
+            border: 1px solid gray;
+            outline: none;
+            background-color: black;
+            color: white;
+        }
+
+        #saved_progs > .list > .delete_btn {
+            padding: 5px;
+            border: 1px solid gray;
+            outline: none;
+            color: white;
+            background-color: orange;
         }
 
         #send_prog_btn {
@@ -120,18 +165,8 @@
             outline: none;
             box-shadow: none;
             color: white;
-        }
-
-        #gen_off_prog {
-            background-color: black;
-            margin: 0;
+            border: none;
             padding: 5px;
-            outline: none;
-            box-shadow: none;
-            color: white;
-            position: absolute;
-            right: 0;
-            top: 0;
         }
 
         #fps {
@@ -499,15 +534,24 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
 <script type="module">
     const {compile_prog} = wasm_bindgen;
 
+    let saved_progs = [];
+
+    let saved_progs_str = localStorage.getItem("saved_progs");
+    if (saved_progs_str !== null) {
+        saved_progs = JSON.parse(saved_progs_str);
+    }
+
+    const update_saved_progs_in_storage = () => {
+        localStorage.setItem("saved_progs", JSON.stringify(saved_progs));
+    }
+
     async function run() {
         let wasm_response = await fetch("./wasm_blob");
         if (wasm_response.ok) {
             await wasm_bindgen(wasm_response);
             const disassembly_el = document.getElementById("disassembly");
             const source_code_el = document.getElementById("source_code");
-            const source_code_container_el = document.getElementById("source_code_container");
             const send_prog_btn_el = document.getElementById("send_prog_btn");
-            const get_off_prog_btn = document.getElementById("gen_off_prog");
 
             const send_prog = async (bin_prog) => {
                 const base64_prog = btoa(String.fromCharCode(...bin_prog));
@@ -539,7 +583,7 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
                 try {
                     let compile_res_tuple = compile_prog(source_code);
                     disassembly_el.innerText = compile_res_tuple[1];
-                    source_code_container_el.style.borderColor = "green"
+                    source_code_el.style.borderColor = "green"
                     send_prog_btn_el.disabled = false;
                     send_prog_btn_el.style.backgroundColor = "green";
                     send_prog_btn_el.textContent = "Send";
@@ -558,7 +602,7 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
                     };
                 } catch (e) {
                     disassembly_el.innerText = e;
-                    source_code_container_el.style.borderColor = "red"
+                    source_code_el.style.borderColor = "red"
                     send_prog_btn_el.disabled = true;
                     send_prog_btn_el.style.backgroundColor = "gray";
                     send_prog_btn_el.onclick = () => {
@@ -566,14 +610,6 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
                 }
             }
 
-            get_off_prog_btn.onclick = () => {
-                source_code_el.value = "loop{for(i=get_length) {set_pixel(i-1,0,0,0);};blit;}";
-                const event = new Event('input', {
-                    bubbles: true,
-                    cancelable: true,
-                });
-                source_code_el.dispatchEvent(event);
-            }
             source_code_el.oninput = (event) => try_compile(event.target.value.toLowerCase())
             try_compile(source_code_el.value.toLowerCase())
         } else {
@@ -584,6 +620,7 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
     document.addEventListener('DOMContentLoaded', (event) => {
         run();
 
+        const source_code_el = document.getElementById("source_code");
         const programming_tab_btn = document.getElementById("programming_tab_btn");
         const programming_tab = document.getElementById("programming_tab");
         const configuring_tab_btn = document.getElementById("configuring_tab_btn");
@@ -621,16 +658,91 @@ wasm_bindgen = Object.assign(init, { initSync }, __exports);
             )
             send_cfg_response_el.innerText = await response.text();
         });
+
+        const saved_progs_list_container = document.getElementById("saved_progs").getElementsByClassName("list")[0];
+        const saved_prog_btn = document.getElementById("saved_progs").getElementsByClassName("save_btn")[0];
+
+        saved_prog_btn.onclick = () => {
+            let to_save = source_code_el.value;
+            if (to_save !== "") {
+                const max_name_length = 10;
+                const name = prompt(`Under what name should I save it? Max ${max_name_length} symbols.`);
+                if (name.length > max_name_length) {
+                    alert(`Too long name, max ${max_name_length}`)
+                } else {
+
+                    saved_progs.push({
+                        name: name,
+                        prog: to_save
+                    })
+                    update_saved_progs_in_storage();
+                    update_saved();
+                }
+            } else {
+                alert("empty source code, why?");
+            }
+        }
+
+        const remove_prog_at = (i) => {
+            const is_confirmed = confirm("Delete this preset?");
+            if (is_confirmed) {
+                saved_progs.splice(i, 1);
+                update_saved_progs_in_storage();
+                update_saved()
+            }
+        }
+
+        const trigger_source_code_input = () => {
+            const event = new Event('input', {
+                bubbles: true,
+                cancelable: true,
+            });
+
+            source_code_el.dispatchEvent(event);
+        }
+
+        const update_saved = () => {
+            saved_progs_list_container.innerHTML = ''
+            for (const prog_i in saved_progs) {
+                const apply_btn = document.createElement("button");
+                const delete_btn = document.createElement("button");
+
+                apply_btn.textContent = `#${saved_progs[prog_i].name}`;
+                apply_btn.className = "apply_btn";
+                delete_btn.textContent = "X"
+                delete_btn.className = "delete_btn";
+
+                delete_btn.onclick = () => {
+                    remove_prog_at(prog_i);
+                }
+
+                apply_btn.onclick = () => {
+                    source_code_el.value = saved_progs[prog_i].prog;
+                    trigger_source_code_input();
+                }
+
+                saved_progs_list_container.appendChild(
+                    apply_btn
+                )
+                saved_progs_list_container.appendChild(
+                    delete_btn
+                )
+            }
+        }
+
+        update_saved()
     })
 </script>
 <div id="root_container">
     <button id="programming_tab_btn">Programming</button>
     <button id="configuring_tab_btn">Configuring</button>
     <div id="programming_tab">
-        <button id="send_prog_btn">Send</button>
-        <div id="source_code_container">
-            <button id="gen_off_prog">GEN OFF</button>
-            <textarea id="source_code" name="source_code" placeholder="Write prog here"></textarea>
+        <button id="send_prog_btn">Send</span></button>
+        <textarea id="source_code" name="source_code" placeholder="Write prog here"></textarea>
+        <div id="saved_progs">
+            <button class="save_btn">Save</button>
+            <div class="description">Saved progs:</div>
+            <div class="list"></div>
         </div>
         <div id="disassembly" style="font-family: monospace;"></div>
     </div>
