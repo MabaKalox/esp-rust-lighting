@@ -27,6 +27,7 @@ use std::time::Duration;
 
 mod sub_modules;
 use crate::sub_modules::esp_sntp_wrapper::EspSntpWrapper;
+use crate::sub_modules::led_strip_animations::AnimationConfig;
 use sub_modules::led_strip_animations::LedStripAnimation;
 use sub_modules::web_server::web_server;
 
@@ -37,6 +38,9 @@ struct TConfig {
 
     #[default("some_pass")]
     wifi_pass: &'static str,
+
+    #[default(150)]
+    led_quantity: usize,
 
     #[default("error")]
     log_level: &'static str,
@@ -82,7 +86,7 @@ fn main() -> Result<()> {
     })?;
 
     let sntp = EspSntpWrapper::new_default()?;
-    sntp.wait_status_with_timeout(Duration::from_secs(10), |status| {
+    sntp.wait_status_with_timeout(Duration::from_secs(20), |status| {
         *status == SyncStatus::Completed
     })
     .unwrap();
@@ -96,10 +100,17 @@ fn main() -> Result<()> {
     let _httpd = web_server(tx, applied_config_rx)?;
 
     let thr = std::thread::spawn(move || {
-        LedStripAnimation::new(pins.gpio6, 0, Default::default())
-            .unwrap()
-            .led_strip_loop(rx, applied_config_tx)
-            .unwrap()
+        LedStripAnimation::new(
+            pins.gpio6,
+            0,
+            AnimationConfig {
+                led_quantity: T_CONFIG.led_quantity,
+                ..Default::default()
+            },
+        )
+        .unwrap()
+        .led_strip_loop(rx, applied_config_tx)
+        .unwrap()
     });
 
     thr.join().unwrap();

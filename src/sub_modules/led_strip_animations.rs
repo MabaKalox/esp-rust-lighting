@@ -18,9 +18,9 @@ static LOOP_OFF_PROG: &[u8] = binary_macros::base64!("4FAPACARAYEQ4wFxQAEAAeRAAA
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnimationConfig {
-    led_quantity: usize,
-    fps: usize,
-    white_brightness: u8,
+    pub led_quantity: usize,
+    pub fps: usize,
+    pub white_brightness: u8,
 }
 
 #[derive(Default, PartialEq, Deserialize)]
