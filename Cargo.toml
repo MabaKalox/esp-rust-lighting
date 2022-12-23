@@ -5,8 +5,12 @@ authors = ["maba_kalox <llocnex@gmail.com>"]
 edition = "2021"
 resolver = "2"
 
+[workspace]
+members = ["frontend"]
+
 [profile.release]
 opt-level = "s"
+lto = true
 
 [profile.dev]
 debug = true    # Symbols are nice and they don't increase the size on Flash
@@ -37,7 +41,7 @@ binary_macros = "1.0.0"
 [build-dependencies]
 embuild = "0.31.0"
 anyhow = "1"
-
+wasm-bindgen-cli-support = "0.2.83"
 
 [patch.crates-io]
 ws2812-esp32-rmt-driver = { git = "https://github.com/vojty/ws2812-esp32-rmt-driver.git", branch = "upgrade-esp-idf-sys-0.32" } # Untill PR merged

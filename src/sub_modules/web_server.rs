@@ -10,8 +10,9 @@ use std::sync::mpsc::{Receiver, SyncSender};
 
 use super::led_strip_animations::ReceivedAnimationConfig;
 
-static WASM_BLOB: &[u8] = include_bytes!("../../webblob/wasm_blob");
-static HTML_BLOB: &[u8] = include_bytes!("../../webblob/index.html");
+static WASM_BLOB: &[u8] = include_bytes!(env!("WASM_BLOB_PATH"));
+static JS_BLOB: &[u8] = include_bytes!(env!("JS_BLOB_PATH"));
+static HTML_BLOB: &[u8] = include_bytes!("../../frontend/index.html");
 
 trait QueryStr {
     fn query_str(&self) -> Option<&str>;
@@ -38,9 +39,16 @@ pub fn web_server(
         Ok(())
     })?;
 
-    server.fn_handler("/wasm_blob", Method::Get, |req| {
+    server.fn_handler("/get_wasm_blob", Method::Get, |req| {
         req.into_response(200, None, &[("Content-Type", "application/wasm")])?
             .write_all(WASM_BLOB)?;
+
+        Ok(())
+    })?;
+
+    server.fn_handler("/get_js_blob", Method::Get, |req| {
+        req.into_response(200, None, &[("Content-Type", "text/javascript")])?
+            .write_all(JS_BLOB)?;
 
         Ok(())
     })?;
