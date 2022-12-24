@@ -12,8 +12,8 @@ using web-fronend and send them to the microcontroller for demonstrating on
 sk6812 addressable led strip. For compiling and running [animation-lang](https://github.com/MabaKalox/animation-lang)
 is used.
 
-* Compiler is running in client browser though webassembly, and convert text into compiled program
-* Virtual-machine is running on microcontroller as runtime for compiled programs
+* Compiler is running in client browser though webassembly, it converts source code into bytecode (p-code).
+* Virtual-machine (p-code machine) is running on microcontroller, which executes received bytecode program.
 
 For details about animation language and examples of programs, please
 check my [animation-lang](https://github.com/MabaKalox/animation-lang) repository.
