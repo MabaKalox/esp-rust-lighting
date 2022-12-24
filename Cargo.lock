@@ -23,7 +23,7 @@ dependencies = [
 [[package]]
 name = "animation-lang"
 version = "0.1.0"
-source = "git+https://github.com/MabaKalox/animation-lang.git#af50b26004685fc0c7cbd8090e855c4ec0f875ea"
+source = "git+https://github.com/MabaKalox/animation-lang.git#2e1c165e2052913e1c8ea2a5a37eb3d968a3365d"
 dependencies = [
  "derivative",
  "nom",

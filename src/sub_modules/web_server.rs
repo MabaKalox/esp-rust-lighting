@@ -53,7 +53,7 @@ pub fn web_server(
         Ok(())
     })?;
 
-    server.fn_handler("/set_conf", Method::Get, {
+    server.fn_handler("/set_conf", Method::Post, {
         let tx = tx.clone();
         move |req| {
             let query_str = req.uri().query_str().unwrap_or_default();

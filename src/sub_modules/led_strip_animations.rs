@@ -19,7 +19,7 @@ static LOOP_OFF_PROG: &[u8] = binary_macros::base64!("4FAPACARAYEQ4wFxQAEAAeRAAA
 #[derive(Debug, Clone, Copy)]
 pub struct AnimationConfig {
     pub led_quantity: usize,
-    pub fps: usize,
+    pub fps: u8,
     pub white_brightness: u8,
 }
 
@@ -28,7 +28,7 @@ pub struct AnimationConfig {
 #[serde(deny_unknown_fields)]
 pub struct ReceivedAnimationConfig {
     pub led_quantity: Option<usize>,
-    pub fps: Option<usize>,
+    pub fps: Option<u8>,
     pub white_brightness: Option<u8>,
 }
 

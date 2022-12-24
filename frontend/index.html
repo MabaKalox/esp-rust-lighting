@@ -213,7 +213,7 @@
 <body>
 <!-- Note the usage of `type=module` here as this is an ES6 module -->
 <script type="module">
-    import init, { compile_prog } from '/get_js_blob'; // It is actually endpoint on API
+    import init, {compile_prog} from '/get_js_blob'; // It is actually endpoint on API
 
     let saved_progs = [];
 
@@ -334,7 +334,10 @@
                     fps: fps,
                     led_quantity: led_quantity,
                     white_brightness: white_brightness
-                })), {mode: "cors"}
+                })), {
+                    mode: "cors",
+                    method: "POST"
+                }
             )
             send_cfg_response_el.innerText = await response.text();
         });
