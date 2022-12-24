@@ -153,6 +153,7 @@ Alternatively you can find ip of microcontroller in your router settings and use
 
 The REST API to the std-esp-rust-lightning
 
+---
 #### Send compiled program in base64
 
 Request
@@ -169,6 +170,7 @@ Example
 curl -X POST -d "[base64 encoded compiled program]" http://rust_led_strip.local/send_prog_base64
 ```
 
+---
 #### Set configuration
 
 Request
