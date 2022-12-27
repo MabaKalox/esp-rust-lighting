@@ -23,7 +23,7 @@ dependencies = [
 [[package]]
 name = "animation-lang"
 version = "0.1.0"
-source = "git+https://github.com/MabaKalox/animation-lang.git#2e1c165e2052913e1c8ea2a5a37eb3d968a3365d"
+source = "git+https://github.com/MabaKalox/animation-lang.git#fb48f1cfdc1f007c6edf9a061dc0410f8f7ec8a3"
 dependencies = [
  "derivative",
  "nom",
@@ -1440,18 +1440,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.151"
+version = "1.0.152"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97fed41fc1a24994d044e6db6935e69511a1153b52c15eb42493b26fa87feba0"
+checksum = "bb7d1f0d3021d347a83e556fc4683dea2ea09d87bccdf88ff5c12545d89d5efb"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.151"
+version = "1.0.152"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "255abe9a125a985c05190d687b320c12f9b1f0b99445e608c21ba0782c719ad8"
+checksum = "af487d118eecd09402d70a5d72551860e788df87b464af30e5ea6a38c75c541e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2104,8 +2104,8 @@ dependencies = [
 
 [[package]]
 name = "ws2812-esp32-rmt-driver"
-version = "0.4.0"
-source = "git+https://github.com/vojty/ws2812-esp32-rmt-driver.git?branch=upgrade-esp-idf-sys-0.32#9ef86d71c07c1c661ae782962d544487900d93a0"
+version = "0.4.1"
+source = "git+https://github.com/vojty/ws2812-esp32-rmt-driver.git?branch=upgrade-esp-idf-sys-0.32#54ff7fd6565bb8c3aa9a63769c60f623c9cd4797"
 dependencies = [
  "anyhow",
  "embedded-graphics-core",
