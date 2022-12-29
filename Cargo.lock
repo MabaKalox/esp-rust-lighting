@@ -23,7 +23,7 @@ dependencies = [
 [[package]]
 name = "animation-lang"
 version = "0.1.0"
-source = "git+https://github.com/MabaKalox/animation-lang.git#fb48f1cfdc1f007c6edf9a061dc0410f8f7ec8a3"
+source = "git+https://github.com/MabaKalox/animation-lang.git#9cb394c1a5eb2bf9d2360d6f718e2925dff1220e"
 dependencies = [
  "derivative",
  "nom",
@@ -2104,8 +2104,9 @@ dependencies = [
 
 [[package]]
 name = "ws2812-esp32-rmt-driver"
-version = "0.4.1"
-source = "git+https://github.com/vojty/ws2812-esp32-rmt-driver.git?branch=upgrade-esp-idf-sys-0.32#54ff7fd6565bb8c3aa9a63769c60f623c9cd4797"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1208b7e7067a133ef425eb51fc914cdc653899bfbe6c2dabe3c2babf387db71"
 dependencies = [
  "anyhow",
  "embedded-graphics-core",

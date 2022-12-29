@@ -16,6 +16,10 @@ fn main() -> anyhow::Result<()> {
 
     // Rerun build script if frontend crate changed
     println!("cargo:rerun-if-changed={}", frontend_crate_dir.display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        Path::new("./Cargo.lock").display()
+    );
     // Compile frontend crate to webassembly
     assert!(Command::new("cargo")
         .arg("build")
