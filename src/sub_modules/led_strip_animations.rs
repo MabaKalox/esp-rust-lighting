@@ -68,7 +68,7 @@ pub struct LedStripAnimation {
 
 enum VmStatus {
     Running(VMState),
-    Stoped((VM, VMStateConfig)),
+    Stopped((VM, VMStateConfig)),
 }
 
 impl LedStripAnimation {
@@ -118,7 +118,7 @@ impl LedStripAnimation {
                                 vm.set_stip_length(self.config.led_quantity);
                                 vm_status = VmStatus::Running(vm.start(prog, cfg));
                             }
-                            VmStatus::Stoped(_) => (),
+                            VmStatus::Stopped(_) => (),
                         }
                     }
                     Messages::NewProg(prog) => {
@@ -128,7 +128,7 @@ impl LedStripAnimation {
                                 let (vm, cfg, _) = vm_state.stop();
                                 vm.start(prog, cfg)
                             }
-                            VmStatus::Stoped((vm, cfg)) => vm.start(prog, cfg),
+                            VmStatus::Stopped((vm, cfg)) => vm.start(prog, cfg),
                         });
                     }
                 },
@@ -156,13 +156,13 @@ impl LedStripAnimation {
                             info!("Program ended");
                             info!("Halting VM and Waiting for new prog...");
                             let (vm, cfg, _) = vm_state.stop();
-                            VmStatus::Stoped((vm, cfg))
+                            VmStatus::Stopped((vm, cfg))
                         }
                         Some(Err(e)) => {
                             error!("{:?}", e);
                             info!("Halting VM and Waiting for new prog...");
                             let (vm, cfg, _) = vm_state.stop();
-                            VmStatus::Stoped((vm, cfg))
+                            VmStatus::Stopped((vm, cfg))
                         }
                         Some(Ok(v)) => {
                             self.ws2812.write(v.map(|c| {

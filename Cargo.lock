@@ -625,6 +625,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "enum_dispatch"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1693044dcf452888dd3a6a6a0dab67f0652094e3920dfe029a54d2f37d9b7394"
+dependencies = [
+ "once_cell",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "enumset"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -676,8 +688,7 @@ dependencies = [
 [[package]]
 name = "esp-idf-svc"
 version = "0.45.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6035126eeaf81d19ca5342fa8f36e85489c6fba1148ec8af167a6b9bff39e0f"
+source = "git+https://github.com/esp-rs/esp-idf-svc.git#0a73517af39e695ec5f0b81bb2f7eb13c1386758"
 dependencies = [
  "anyhow",
  "embedded-svc",
@@ -1156,9 +1167,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.16.0"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+checksum = "6f61fba1741ea2b3d6a1e3178721804bb716a68a6aeba1149b5d52e3d464ea66"
 
 [[package]]
 name = "peeking_take_while"
@@ -1531,13 +1542,17 @@ dependencies = [
  "embedded-hal 0.2.7",
  "embedded-svc",
  "embuild 0.31.0",
+ "enum_dispatch",
  "esp-idf-hal",
  "esp-idf-svc",
  "esp-idf-sys",
  "form_urlencoded",
+ "heapless",
+ "lazy_static",
  "log",
  "rand",
  "serde",
+ "serde_json",
  "serde_urlencoded",
  "smart-leds-trait",
  "thiserror",
