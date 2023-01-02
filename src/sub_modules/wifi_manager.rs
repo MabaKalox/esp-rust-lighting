@@ -177,11 +177,9 @@ pub mod wifi_states {
 
             Ok(WifiMixedStarted(self))
         }
-    }
 
-    impl WifiMixedStarted {
         pub fn connect(mut self, creds: WifiCredentials) -> Result<WifiState> {
-            let mut config = self.0 .0.wifi.get_configuration()?;
+            let mut config = self.0.wifi.get_configuration()?;
 
             match &mut config {
                 Configuration::Mixed(sta, _) => {
@@ -192,28 +190,39 @@ pub mod wifi_states {
                 _ => unreachable!(),
             }
 
-            self.0 .0.wifi.set_configuration(&config)?;
+            let mut started_wifi = self.start()?;
+            started_wifi.0 .0.wifi.set_configuration(&config)?;
 
-            self.0 .0.wifi.connect()?;
+            started_wifi.0 .0.wifi.connect()?;
 
-            if EspNetifWait::new::<EspNetif>(self.0 .0.wifi.sta_netif(), &self.0 .0.sysloop)?
-                .wait_with_timeout(Duration::from_secs(20), || {
-                    self.0 .0.wifi.is_connected().unwrap()
-                        && self.0 .0.wifi.sta_netif().get_ip_info().unwrap().ip
-                            != Ipv4Addr::new(0, 0, 0, 0)
-                })
-            {
-                let ip_info = self.0 .0.wifi.sta_netif().get_ip_info()?;
+            if EspNetifWait::new::<EspNetif>(
+                started_wifi.0 .0.wifi.sta_netif(),
+                &started_wifi.0 .0.sysloop,
+            )?
+            .wait_with_timeout(Duration::from_secs(20), || {
+                started_wifi.0 .0.wifi.is_connected().unwrap()
+                    && started_wifi.0 .0.wifi.sta_netif().get_ip_info().unwrap().ip
+                        != Ipv4Addr::new(0, 0, 0, 0)
+            }) {
+                let ip_info = started_wifi.0 .0.wifi.sta_netif().get_ip_info()?;
 
                 info!("Wifi DHCP info: {:?}", ip_info);
 
                 ping(ip_info.subnet.gateway)?;
 
-                Ok(WifiState::Connected(WifiMixedConnected(self)))
+                Ok(WifiState::Connected(WifiMixedConnected(started_wifi)))
             } else {
                 info!("Connection timeout");
-                Ok(WifiState::Started(self))
+                Ok(WifiState::Started(started_wifi))
             }
+        }
+    }
+
+    impl WifiMixedStarted {
+        pub fn stop(mut self) -> Result<WifiMixed> {
+            self.0 .0.wifi.stop()?;
+
+            Ok(self.0)
         }
     }
 
@@ -349,13 +358,11 @@ impl WifiManager {
             },
         );
 
-        let started_wifi = WifiBase::new(modem, sysloop)?
-            .configure(&wifi_initial_cfg)?
-            .start()?;
+        let wifi = WifiBase::new(modem, sysloop)?.configure(&wifi_initial_cfg)?;
 
         let wifi_state = match wifi_creds {
-            Some(creds) => started_wifi.connect(creds)?,
-            None => WifiState::Started(started_wifi),
+            Some(creds) => wifi.connect(creds)?,
+            None => WifiState::Started(wifi.start()?),
         };
 
         Ok(Self { state: wifi_state })
@@ -381,12 +388,18 @@ impl WifiManager {
                             WifiManagerCmd::TryConnect(connect_args) => {
                                 std::thread::sleep(Duration::from_millis(1000));
                                 manager.state = match manager.state {
-                                    WifiState::Started(m) => m.connect(connect_args.creds).unwrap(),
-                                    WifiState::Connected(m) => {
-                                        m.disconnect().unwrap().connect(connect_args.creds).unwrap()
+                                    WifiState::Started(m) => {
+                                        m.stop().unwrap().connect(connect_args.creds).unwrap()
                                     }
+                                    WifiState::Connected(m) => m
+                                        .disconnect()
+                                        .unwrap()
+                                        .stop()
+                                        .unwrap()
+                                        .connect(connect_args.creds)
+                                        .unwrap(),
                                 };
-                                // Check if we connected and if we need to store credentials
+                                // Check if we connected and store credentials if requested
                                 match &manager.state {
                                     WifiState::Connected(m) if connect_args.store_on_connect => {
                                         m.get_creds().unwrap().store().unwrap();
@@ -398,7 +411,9 @@ impl WifiManager {
                                 WifiState::Connected(m) => {
                                     disconnect_res_tx.send(Ok(())).unwrap();
                                     std::thread::sleep(Duration::from_millis(1000));
-                                    manager.state = WifiState::Started(m.disconnect().unwrap());
+                                    manager.state = WifiState::Started(
+                                        m.disconnect().unwrap().stop().unwrap().start().unwrap(),
+                                    );
                                 }
                                 WifiState::Started(_) => {
                                     disconnect_res_tx.send(Err(APIError::NotConnected)).unwrap();

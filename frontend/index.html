@@ -18,8 +18,9 @@
         #root_container {
             display: grid;
             grid-template-areas:
-            "programming_tab_btn configuring_tab_btn"
-            "some_tab some_tab";
+            "programming_tab_btn configuring_tab_btn wifi_tab_btn"
+            "some_tab some_tab some_tab";
+            grid-template-columns: 3fr 3fr 1fr;
             grid-template-rows: min-content auto;
             height: 100%;
             width: 100%;
@@ -38,6 +39,14 @@
 
         #configuring_tab_btn {
             grid-area: configuring_tab_btn;
+            background-color: black;
+            color: white;
+            border: none;
+            padding: 5px;
+        }
+
+        #wifi_tab_btn {
+            grid-area: wifi_tab_btn;
             background-color: black;
             color: white;
             border: none;
@@ -74,6 +83,20 @@
             grid-template-rows: min-content min-content min-content min-content max-content;
             grid-template-columns: min-content auto;
             gap: 5px;
+        }
+
+        #wifi_tab {
+            display: none;
+            grid-area: some_tab;
+            width: 100%;
+            height: 100%;
+            grid-template-columns: auto min-content;
+            grid-template-rows: min-content min-content min-content;
+            grid-template-areas:
+                "status refresh"
+                "available_networks available_networks"
+                "action action";
+            gap: 8px;
         }
 
         @media (min-width: 1025px) {
@@ -207,9 +230,85 @@
             font-family: monospace;
             border: 1px solid gray;
         }
+
+        #wifi_tab > .status {
+            grid-area: status;
+            border: 1px solid black;
+            padding: 5px;
+            color: white;
+            text-align: center;
+        }
+
+        #wifi_tab > .refresh {
+            background-color: cyan;
+            margin: 0;
+            outline: none;
+            box-shadow: none;
+            color: white;
+            border: none;
+            padding: 5px;
+            grid-area: refresh;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #wifi_tab > .refresh > span {
+            line-height: 1;
+            display: inline-block;
+            font-size: 1.5em;
+            animation: spin 2s linear infinite;
+            animation-play-state: paused;
+        }
+
+        #wifi_tab > .available_networks {
+            grid-area: available_networks;
+            display: grid;
+            gap: 5px;
+            grid-auto-rows: min-content;
+            padding: 8px 0;
+            border-bottom: 1px solid gray;
+            border-top: 1px solid gray;
+        }
+
+        #wifi_tab > .available_networks > .wifi_ap {
+            background-color: crimson;
+            margin: 0;
+            outline: none;
+            box-shadow: none;
+            color: white;
+            border: none;
+            padding: 5px;
+        }
+
+        #wifi_tab > .action {
+            margin: 0;
+            outline: none;
+            box-shadow: none;
+            color: white;
+            border: none;
+            padding: 5px;
+            grid-area: action;
+        }
+
+        #wifi_tab > #wifi_connect {
+            display: inline-block;
+            background-color: green;
+        }
+
+        #wifi_tab > #wifi_disconnect {
+            display: none;
+            background-color: orange;
+        }
     </style>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
 </head>
 <body>
 <!-- Note the usage of `type=module` here as this is an ES6 module -->
@@ -306,12 +405,17 @@
         const programming_tab_btn = document.getElementById("programming_tab_btn");
         const programming_tab = document.getElementById("programming_tab");
         const configuring_tab_btn = document.getElementById("configuring_tab_btn");
+        const wifi_tab = document.getElementById("wifi_tab");
+        const wifi_tab_btn = document.getElementById("wifi_tab_btn");
+
         const configuring_tab = document.getElementById("configuring_tab");
         const send_cfg_response_el = document.getElementById("send_cfg_response");
 
         programming_tab_btn.onclick = () => {
             programming_tab_btn.style.backgroundColor = "orange"
             programming_tab.style.display = "grid";
+            wifi_tab_btn.style.backgroundColor = "black"
+            wifi_tab.style.display = "none";
             configuring_tab_btn.style.backgroundColor = "black"
             configuring_tab.style.display = "none";
         }
@@ -319,8 +423,21 @@
         configuring_tab_btn.onclick = () => {
             programming_tab_btn.style.backgroundColor = "black"
             programming_tab.style.display = "none";
+            wifi_tab_btn.style.backgroundColor = "black"
+            wifi_tab.style.display = "none";
             configuring_tab_btn.style.backgroundColor = "orange"
             configuring_tab.style.display = "grid";
+        }
+
+        wifi_tab_btn.onclick = () => {
+            programming_tab_btn.style.backgroundColor = "black"
+            programming_tab.style.display = "none";
+            wifi_tab_btn.style.backgroundColor = "orange"
+            wifi_tab.style.display = "grid";
+            configuring_tab_btn.style.backgroundColor = "black"
+            configuring_tab.style.display = "none";
+
+            refresh();
         }
 
         configuring_tab.addEventListener("submit", async (e) => {
@@ -415,11 +532,114 @@
         }
 
         update_saved()
+
+
+        let wifi_tab_refresh_el = wifi_tab.getElementsByClassName("refresh")[0];
+        let wifi_tab_status_el = wifi_tab.getElementsByClassName("status")[0];
+        let wifi_available_networks_el = wifi_tab.getElementsByClassName("available_networks")[0];
+        let wifi_connect_btn = document.getElementById("wifi_connect");
+        let wifi_disconnect_btn = document.getElementById("wifi_disconnect");
+
+        const wifi_scan = async () => {
+            return await (await fetch("/wifi/scan")).json();
+        }
+
+        const get_status = async () => {
+            return await (await fetch("/wifi/status")).json()
+        }
+
+        const connect_wifi = async (ssid) => {
+            if (ssid === "") {
+                alert("Please select network first");
+            } else {
+                let pass = prompt(`Enter password for: ${ssid}`);
+                if (pass != null && pass.length >= 8 && pass.length <= 64) {
+                    let response = await fetch("/wifi/connect", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            creds: {ssid: ssid, pass: pass},
+                            store_on_connect: true
+                        })
+                    });
+                    if (!response.ok) {
+                        wifi_tab_status_el.innerHTML = await response.text();
+                        wifi_tab_status_el.style.backgroundColor = "red";
+                    } else {
+                        wifi_tab_status_el.innerHTML = "Reconnect your device to check status...";
+                        wifi_tab_status_el.style.backgroundColor = "gray";
+                    }
+                } else {
+                    alert("Wifi password should be 8-64 symbols");
+                }
+
+            }
+        }
+
+        const disconnect_wifi = async () => {
+            if (confirm("Double check... Disconnect?")) {
+
+                let response = await fetch("/wifi/disconnect", {
+                    method: "POST"
+                });
+                if (!response.ok) {
+                    wifi_tab_status_el.innerHTML = await response.text();
+                    wifi_tab_status_el.style.backgroundColor = "red";
+                } else {
+                    wifi_tab_status_el.innerHTML = "Disconnected";
+                    wifi_tab_status_el.style.backgroundColor = "gray";
+                }
+            }
+        }
+
+        let selected_wifi_ssid = "";
+
+        const refresh = async () => {
+            wifi_tab_refresh_el.firstChild.style.animationPlayState = "running";
+            let available_networks = await wifi_scan();
+            let wifi_status = await get_status();
+            wifi_tab_refresh_el.firstChild.style.animationPlayState = "paused";
+            if (available_networks == null || wifi_status == null) {
+                wifi_tab_status_el.style.backgroundColor = "red";
+                wifi_tab_status_el.innerHTML = "Failed";
+                return;
+            }
+
+            if (wifi_status["type"] === "connected") {
+                wifi_tab_status_el.style.backgroundColor = "green";
+                wifi_tab_status_el.innerHTML = `WiFi - Connected to: ${wifi_status["ssid"]}`;
+
+                wifi_connect_btn.style.display = "none";
+                wifi_disconnect_btn.style.display = "inline-block";
+            } else if (wifi_status["type"] === "started") {
+                wifi_tab_status_el.style.backgroundColor = "gray";
+                wifi_tab_status_el.innerHTML = "WiFi - Not connected";
+
+                wifi_connect_btn.style.display = "inline-block";
+                wifi_disconnect_btn.style.display = "none";
+            }
+
+            wifi_available_networks_el.innerHTML = "";
+            for (let el of available_networks) {
+                let wifi_ap = document.createElement("button")
+                wifi_ap.innerHTML = `${el["ssid"]}`;
+                wifi_ap.onclick = () => {
+                    selected_wifi_ssid = el["ssid"];
+                    wifi_connect_btn.getElementsByClassName("target_network")[0].innerHTML = el["ssid"];
+                };
+                wifi_ap.className = "wifi_ap";
+                wifi_available_networks_el.appendChild(wifi_ap);
+            }
+        }
+
+        wifi_tab_refresh_el.onclick = refresh;
+        wifi_connect_btn.onclick = async () => await connect_wifi(selected_wifi_ssid);
+        wifi_disconnect_btn.onclick = async () => await disconnect_wifi();
     })
 </script>
 <div id="root_container">
     <button id="programming_tab_btn">Programming</button>
     <button id="configuring_tab_btn">Configuring</button>
+    <button id="wifi_tab_btn">WiFi</button>
     <div id="programming_tab">
         <button id="send_prog_btn">Send</span></button>
         <textarea id="source_code" name="source_code" placeholder="Write prog here"></textarea>
@@ -440,6 +660,13 @@
         <input type="submit" id="send_conf_btn" value="Submit">
         <div id="send_cfg_response">There would be response</div>
     </form>
+    <div id="wifi_tab">
+        <div class="status">Refresh to check</div>
+        <button class="refresh"><span>&#128472;</span></button>
+        <div class="available_networks"></div>
+        <button id="wifi_connect" class="action">Connect to <b class="target_network">...</b></button>
+        <button id="wifi_disconnect" class="action">Disconnect</button>
+    </div>
 </div>
 </body>
 
