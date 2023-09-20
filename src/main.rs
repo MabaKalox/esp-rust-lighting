@@ -145,7 +145,7 @@ fn init_mdns() -> Result<()> {
             CString::new("_http")?.as_ptr(),
             CString::new("_tcp")?.as_ptr(),
             80,
-            std::ptr::null_mut() as *mut esp_idf_sys::mdns_txt_item_t,
+            std::ptr::null_mut(),
             0
         ))?;
     }

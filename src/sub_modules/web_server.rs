@@ -2,7 +2,6 @@ use crate::sub_modules::led_strip_animations::{AnimationConfig, Messages};
 use crate::sub_modules::wifi_manager::wifi_creds::WifiCredentials;
 use crate::sub_modules::wifi_manager::{TryConnectArgs, WifiManagerCommunication};
 use animation_lang::program::Program;
-use embedded_svc::http::server::Query;
 use embedded_svc::http::Method;
 use embedded_svc::io::adapters::ToStd;
 use embedded_svc::io::Write;
@@ -15,19 +14,6 @@ use super::led_strip_animations::ReceivedAnimationConfig;
 static WASM_BLOB: &[u8] = include_bytes!(env!("WASM_BLOB_PATH"));
 static JS_BLOB: &[u8] = include_bytes!(env!("JS_BLOB_PATH"));
 static HTML_BLOB: &[u8] = include_bytes!("../../frontend/index.html");
-
-pub trait QueryStr {
-    fn query_str(&self) -> Option<&str>;
-}
-
-impl QueryStr for str {
-    fn query_str(&self) -> Option<&str> {
-        match self.split_once('?') {
-            Some(pair) => Some(pair.1),
-            None => None,
-        }
-    }
-}
 
 pub fn web_server(
     tx: SyncSender<Messages>,
@@ -60,17 +46,17 @@ pub fn web_server(
     // Led related
     server.fn_handler("/set_conf", Method::Post, {
         let tx = tx.clone();
-        move |req| {
-            let query_str = req.uri().query_str().unwrap_or_default();
-            let new_config: ReceivedAnimationConfig = match serde_urlencoded::from_str(query_str) {
-                Ok(cfg) => cfg,
-                Err(e) => {
-                    let message = e.to_string();
-                    req.into_response(400, Some(&message), &[])?
-                        .write_all(message.as_bytes())?;
-                    return Ok(());
-                }
-            };
+        move |mut req| {
+            let new_config: ReceivedAnimationConfig =
+                match serde_json::from_reader(ToStd::new(&mut req)) {
+                    Ok(cfg) => cfg,
+                    Err(e) => {
+                        let message = e.to_string();
+                        req.into_response(400, Some(&message), &[])?
+                            .write_all(message.as_bytes())?;
+                        return Ok(());
+                    }
+                };
 
             tx.send(Messages::NewConfig(new_config))?;
             req.into_ok_response()?
@@ -80,8 +66,6 @@ pub fn web_server(
     })?;
 
     server.fn_handler("/send_prog_base64", Method::Post, {
-        #[allow(clippy::redundant_clone)]
-        let tx = tx.clone();
         move |mut req| {
             let mut body = Vec::new();
             ToStd::new(&mut req).read_to_end(&mut body)?;

@@ -10,7 +10,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::{SyncSender, TryRecvError};
 use std::time::Duration;
 use ws2812_esp32_rmt_driver::driver::color::LedPixelColorGrbw32;
-use ws2812_esp32_rmt_driver::{LedPixelEsp32Rmt, RGBW8};
+use ws2812_esp32_rmt_driver::{LedPixelEsp32Rmt, RGB8, RGBW8};
 
 type Ws2812I = LedPixelEsp32Rmt<RGBW8, LedPixelColorGrbw32>;
 
@@ -73,9 +73,12 @@ enum VmStatus {
 
 impl LedStripAnimation {
     pub fn new<P: OutputPin>(led_pin: P, rmt_channel: u8, config: AnimationConfig) -> Result<Self> {
-        let ws2812 =
+        let mut ws2812 =
             LedPixelEsp32Rmt::<RGBW8, LedPixelColorGrbw32>::new(rmt_channel, led_pin.pin() as u32)
                 .map_err(|e| anyhow!("{:?}", e))?;
+
+        // Black out led strip
+        ws2812.write((0..1000).map(|_| RGBW8::new_alpha(0, 0, 0, White(0))))?;
 
         Ok(Self { ws2812, config })
     }

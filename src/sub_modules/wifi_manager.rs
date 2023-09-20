@@ -105,20 +105,16 @@ pub mod wifi_creds {
 pub mod wifi_states {
     use super::net_utils::ping;
     use super::wifi_creds::WifiCredentials;
-    use anyhow::{bail, Result};
+    use anyhow::Result;
     use embedded_svc::wifi::{AccessPointInfo, Configuration, Wifi};
     use enum_dispatch::enum_dispatch;
     use esp_idf_hal::peripheral;
     use esp_idf_svc::eventloop::EspSystemEventLoop;
-    use esp_idf_svc::netif::{EspNetif, EspNetifWait};
-    use esp_idf_svc::wifi::{EspWifi, WifiWait};
+    use esp_idf_svc::wifi::{BlockingWifi, EspWifi};
     use log::info;
-    use std::net::Ipv4Addr;
-    use std::time::Duration;
 
     pub struct WifiBase {
-        wifi: EspWifi<'static>,
-        sysloop: EspSystemEventLoop,
+        wifi: BlockingWifi<EspWifi<'static>>,
     }
     // Wifi Manager states
     pub struct WifiMixed(WifiBase);
@@ -136,9 +132,9 @@ pub mod wifi_states {
             modem: impl peripheral::Peripheral<P = esp_idf_hal::modem::Modem> + 'static,
             sysloop: EspSystemEventLoop,
         ) -> Result<Self> {
-            let wifi = EspWifi::new(modem, sysloop.clone(), None)?;
+            let wifi = BlockingWifi::wrap(EspWifi::new(modem, sysloop.clone(), None)?, sysloop)?;
 
-            Ok(Self { wifi, sysloop })
+            Ok(Self { wifi })
         }
 
         pub fn configure(mut self, config: &Configuration) -> Result<WifiMixed> {
@@ -169,12 +165,6 @@ pub mod wifi_states {
         pub fn start(mut self) -> Result<WifiMixedStarted> {
             self.0.wifi.start()?;
 
-            if !WifiWait::new(&self.0.sysloop)?.wait_with_timeout(Duration::from_secs(20), || {
-                self.0.wifi.is_started().unwrap()
-            }) {
-                bail!("Wifi did not start");
-            }
-
             Ok(WifiMixedStarted(self))
         }
 
@@ -190,30 +180,25 @@ pub mod wifi_states {
                 _ => unreachable!(),
             }
 
+            self.0.wifi.set_configuration(&config)?;
             let mut started_wifi = self.start()?;
-            started_wifi.0 .0.wifi.set_configuration(&config)?;
 
             started_wifi.0 .0.wifi.connect()?;
 
-            if EspNetifWait::new::<EspNetif>(
-                started_wifi.0 .0.wifi.sta_netif(),
-                &started_wifi.0 .0.sysloop,
-            )?
-            .wait_with_timeout(Duration::from_secs(20), || {
-                started_wifi.0 .0.wifi.is_connected().unwrap()
-                    && started_wifi.0 .0.wifi.sta_netif().get_ip_info().unwrap().ip
-                        != Ipv4Addr::new(0, 0, 0, 0)
-            }) {
-                let ip_info = started_wifi.0 .0.wifi.sta_netif().get_ip_info()?;
+            match started_wifi.0 .0.wifi.wait_netif_up() {
+                Ok(_) => {
+                    let ip_info = started_wifi.0 .0.wifi.wifi().sta_netif().get_ip_info()?;
 
-                info!("Wifi DHCP info: {:?}", ip_info);
+                    info!("Wifi DHCP info: {:?}", ip_info);
 
-                ping(ip_info.subnet.gateway)?;
+                    ping(ip_info.subnet.gateway)?;
 
-                Ok(WifiState::Connected(WifiMixedConnected(started_wifi)))
-            } else {
-                info!("Connection timeout");
-                Ok(WifiState::Started(started_wifi))
+                    Ok(WifiState::Connected(WifiMixedConnected(started_wifi)))
+                }
+                Err(e) => {
+                    info!("Connection failed: {:?}", e);
+                    Ok(WifiState::Started(started_wifi))
+                }
             }
         }
     }

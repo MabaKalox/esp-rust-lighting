@@ -443,18 +443,19 @@
         configuring_tab.addEventListener("submit", async (e) => {
             e.preventDefault();
             const data = new FormData(e.target);
-            const fps = data.get("fps");
-            const led_quantity = data.get("led_quantity");
-            const white_brightness = data.get("white_brightness");
+            const fps = Number(data.get("fps"));
+            const led_quantity = Number(data.get("led_quantity"));
+            const white_brightness = Number(data.get("white_brightness"));
 
             let response = await fetch(
-                "/set_conf?" + new URLSearchParams(({
-                    fps: fps,
-                    led_quantity: led_quantity,
-                    white_brightness: white_brightness
-                })), {
+                "/set_conf", {
                     mode: "cors",
-                    method: "POST"
+                    method: "POST",
+                    body: JSON.stringify({
+                        fps: fps,
+                        led_quantity: led_quantity,
+                        white_brightness: white_brightness
+                    })
                 }
             )
             send_cfg_response_el.innerText = await response.text();
@@ -465,7 +466,8 @@
 
         saved_prog_btn.onclick = () => {
             let to_save = source_code_el.value;
-            if (to_save !== "") {
+            if (to_save !== "")
+            {
                 const max_name_length = 10;
                 const name = prompt(`Under what name should I save it? Max ${max_name_length} symbols.`);
                 if (name.length > max_name_length) {

@@ -35,11 +35,11 @@ check my [animation-lang](https://github.com/MabaKalox/animation-lang) repositor
 
 1) Clone project repository
    ```sh
-   git clone https://github.com/MabaKalox/std-esp-rust-lighting.git
+   git clone https://github.com/MabaKalox/esp-rust-lighting.git
    ```
 2) Navigate into it
    ```sh
-   cd std-esp-rust-lighting
+   cd esp-rust-lighting
    ```
 
 ### Configuring
@@ -51,7 +51,7 @@ number of leds on your led strip.
 1) create `cfg.toml` file in project directory with following content:
 
 ```toml
-[std-esp-rust-lighting]
+[esp-rust-lighting]
 wifi_ssid = "your wifi SSID"
 wifi_pass = "your wifi password"
 led_quantity = 150
@@ -81,7 +81,7 @@ led_quantity = 150
    ```
 2) Flash, replace `/dev/ttyACM0` by path to `tty` device of connected esp32-c3 over usb.
    ```
-   espflash --speed 921600 --partition-table partitions.csv /dev/ttyACM0 /target/riscv32imc-esp-espidf/release/std-esp-rust-lighting
+   espflash --speed 921600 --partition-table partitions.csv /dev/ttyACM0 /target/riscv32imc-esp-espidf/release/esp-rust-lighting
    ```
 
 ## Usage
@@ -151,7 +151,7 @@ Alternatively you can find ip of microcontroller in your router settings and use
 
 ### REST API
 
-The REST API to the std-esp-rust-lightning
+The REST API to the esp-rust-lightning
 
 ---
 #### Send compiled program in base64
