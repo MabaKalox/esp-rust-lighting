@@ -535,6 +535,23 @@
 
         update_saved()
 
+        const update_max_led_quantity = async () => {
+            let response = await fetch("/get_max_led_quantity", {
+                method: "GET"
+            });
+            let max_led_quantity = 0;
+            if (!response.ok) {
+                console.log("Failed to get max led quantity")
+                console.log(response)
+                max_led_quantity = 150;
+            } else {
+                max_led_quantity = parseInt(await response.text());
+            }
+            console.log(max_led_quantity)
+            document.getElementById("led_quantity").defaultValue = max_led_quantity.toString();
+        }
+        update_max_led_quantity();
+
 
         let wifi_tab_refresh_el = wifi_tab.getElementsByClassName("refresh")[0];
         let wifi_tab_status_el = wifi_tab.getElementsByClassName("status")[0];
@@ -656,7 +673,7 @@
         <label for="fps" id="fps_label">FPS:</label>
         <input type="number" id="fps" name="fps" value="60">
         <label for="led_quantity" id="led_quantity_label">Led quantity:</label>
-        <input type="number" id="led_quantity" name="led_quantity" value="150">
+        <input type="number" id="led_quantity" name="led_quantity">
         <label for="white_brightness" id="white_brightness_label">White brightness:</label>
         <input type="range" min="0" max="255" id="white_brightness" name="white_brightness" value="0">
         <input type="submit" id="send_conf_btn" value="Submit">

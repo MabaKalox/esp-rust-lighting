@@ -4,7 +4,7 @@ use animation_lang::vm::{VMState, VMStateConfig, VM};
 use anyhow::{anyhow, Result};
 use esp_idf_hal::gpio::OutputPin;
 use log::{error, info};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use smart_leds_trait::{SmartLedsWrite, White};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::{SyncSender, TryRecvError};

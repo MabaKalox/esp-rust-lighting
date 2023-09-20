@@ -1,6 +1,7 @@
 use crate::sub_modules::led_strip_animations::{AnimationConfig, Messages};
 use crate::sub_modules::wifi_manager::wifi_creds::WifiCredentials;
 use crate::sub_modules::wifi_manager::{TryConnectArgs, WifiManagerCommunication};
+use crate::T_CONFIG;
 use animation_lang::program::Program;
 use embedded_svc::http::Method;
 use embedded_svc::io::adapters::ToStd;
@@ -39,6 +40,13 @@ pub fn web_server(
     server.fn_handler("/get_js_blob", Method::Get, |req| {
         req.into_response(200, None, &[("Content-Type", "text/javascript")])?
             .write_all(JS_BLOB)?;
+
+        Ok(())
+    })?;
+
+    server.fn_handler("/get_max_led_quantity", Method::Get, |req| {
+        req.into_response(200, None, &[("Content-Type", "text/plain")])?
+            .write_all(T_CONFIG.led_quantity.to_string().as_bytes())?;
 
         Ok(())
     })?;
