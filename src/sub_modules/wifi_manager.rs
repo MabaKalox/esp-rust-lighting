@@ -12,25 +12,25 @@ use thiserror::Error;
 use wifi_creds::WifiCredentials;
 use wifi_states::{Scan, WifiBase, WifiState};
 
-pub mod net_utils {
-    use anyhow::{bail, Result};
-    use esp_idf_svc::ping;
-    use log::info;
-    use std::net::Ipv4Addr;
-
-    pub fn ping(ip: Ipv4Addr) -> Result<()> {
-        info!("About to do some pings for {:?}", ip);
-
-        let ping_summary = ping::EspPing::default().ping(ip, &Default::default())?;
-        if ping_summary.transmitted != ping_summary.received {
-            bail!("Pinging IP {} resulted in timeouts", ip);
-        }
-
-        info!("Pinging done");
-
-        Ok(())
-    }
-}
+// pub mod net_utils {
+//     use anyhow::{bail, Result};
+//     use esp_idf_svc::ping;
+//     use log::info;
+//     use std::net::Ipv4Addr;
+//
+//     pub fn ping(ip: Ipv4Addr) -> Result<()> {
+//         info!("About to do some pings for {:?}", ip);
+//
+//         let ping_summary = ping::EspPing::default().ping(ip, &Default::default())?;
+//         if ping_summary.transmitted != ping_summary.received {
+//             bail!("Pinging IP {} resulted in timeouts", ip);
+//         }
+//
+//         info!("Pinging done");
+//
+//         Ok(())
+//     }
+// }
 
 pub mod wifi_creds {
     use embedded_svc::storage::RawStorage;
@@ -103,7 +103,7 @@ pub mod wifi_creds {
 }
 
 pub mod wifi_states {
-    use super::net_utils::ping;
+    // use super::net_utils::ping;
     use super::wifi_creds::WifiCredentials;
     use anyhow::Result;
     use embedded_svc::wifi::{AccessPointInfo, Configuration, Wifi};
@@ -190,8 +190,6 @@ pub mod wifi_states {
                     let ip_info = started_wifi.0 .0.wifi.wifi().sta_netif().get_ip_info()?;
 
                     info!("Wifi DHCP info: {:?}", ip_info);
-
-                    ping(ip_info.subnet.gateway)?;
 
                     Ok(WifiState::Connected(WifiMixedConnected(started_wifi)))
                 }
